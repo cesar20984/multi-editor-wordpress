@@ -134,7 +134,7 @@ export function AITiptapEditor({ project, settings, existingPost }: { project: a
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    id: postIdRef.current, // Use Ref to avoid stale closure
+                    id: postIdRef.current,
                     projectId: project.id,
                     title: rTitle,
                     slug: rSlug,
@@ -146,10 +146,15 @@ export function AITiptapEditor({ project, settings, existingPost }: { project: a
                     categoryId: rCategoryId || null,
                 })
             });
+
+            if (!res.ok) {
+                if (res.status === 413) throw new Error("El artículo es demasiado grande (muchas imágenes). Intenta publicar o reducir imágenes.");
+                throw new Error(`Error del servidor: ${res.status}`);
+            }
+
             const data = await res.json();
             if (data.success && data.post) {
                 if (!postIdRef.current) {
-                    // First save: set the postId and update URL
                     postIdRef.current = data.post.id;
                     setPostId(data.post.id);
                     window.history.replaceState(null, '', `/projects/${project.id}/editor/${data.post.id}`);
@@ -157,15 +162,18 @@ export function AITiptapEditor({ project, settings, existingPost }: { project: a
                 const now = new Date();
                 setLastSaved(now.toLocaleTimeString());
                 return data.post;
+            } else {
+                throw new Error(data.error || "Error desconocido al guardar");
             }
-        } catch (e) {
+        } catch (e: any) {
             console.error("Auto-save error:", e);
+            showToast("❌ Error al guardar borrador: " + e.message, "error");
         } finally {
             isSavingRef.current = false;
             setSavingDraft(false);
         }
         return null;
-    }, [editor, project.id]);
+    }, [editor, project.id, showToast]);
 
     // Debounced auto-save: triggers 1.2 seconds after last change
     const scheduleSave = useCallback(() => {
@@ -373,11 +381,9 @@ export function AITiptapEditor({ project, settings, existingPost }: { project: a
                 }).run();
 
                 // Force a save after inserting image
-                // The editor content change will trigger scheduleSave, which will pick up the latest content.
-                // No need to manually update stateRef.current for editor content.
-                saveDraft();
+                await saveDraft();
             } else {
-                alert(data.error || "Error al generar imagen");
+                showToast(data.error || "Error al generar imagen", "error");
             }
         } catch (error) {
             console.error(error);
@@ -415,9 +421,7 @@ export function AITiptapEditor({ project, settings, existingPost }: { project: a
                 }).run();
 
                 // Force a save after inserting infographic
-                // The editor content change will trigger scheduleSave, which will pick up the latest content.
-                // No need to manually update stateRef.current for editor content.
-                saveDraft();
+                await saveDraft();
             } else {
                 showToast(data.error || "Error al generar infografía", "error");
             }
@@ -592,8 +596,24 @@ export function AITiptapEditor({ project, settings, existingPost }: { project: a
                     <Link href={`/projects/${project.id}`} style={{ color: 'var(--accent-color)' }}>
                         &larr; Volver al Proyecto
                     </Link>
-                    <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        {savingDraft && <span style={{ color: '#f59e0b' }}>⛏ Guardando borrador...</span>}
+                    <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
+                        <button
+                            onClick={() => saveDraft()}
+                            disabled={savingDraft}
+                            style={{
+                                background: 'rgba(59, 130, 246, 0.15)',
+                                border: '1px solid rgba(59, 130, 246, 0.3)',
+                                color: '#60a5fa',
+                                padding: '0.2rem 0.6rem',
+                                borderRadius: '6px',
+                                cursor: 'pointer',
+                                fontSize: '0.75rem',
+                                fontWeight: 600
+                            }}
+                        >
+                            💾 Guardar Borrador
+                        </button>
+                        {savingDraft && <span style={{ color: '#f59e0b' }}>⛏ Guardando...</span>}
                         {!savingDraft && lastSaved && <span style={{ color: 'var(--success-color)' }}>✓ Guardado {lastSaved}</span>}
                         {existingPost?.wpPostId && <span style={{ background: 'rgba(16,185,129,0.2)', color: 'var(--success-color)', padding: '0.15rem 0.5rem', borderRadius: '8px', fontSize: '0.75rem' }}>WP #{existingPost.wpPostId}</span>}
                     </div>

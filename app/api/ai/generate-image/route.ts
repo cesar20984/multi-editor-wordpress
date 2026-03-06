@@ -167,7 +167,7 @@ export async function POST(request: Request) {
         }
 
         const webpBuffer = await sharpOp
-            .webp({ quality: 80 })
+            .webp({ quality: 75 })
             .toBuffer();
 
         // 4. Generate a proper alt text in the selected language
