@@ -112,13 +112,20 @@ export function AITiptapEditor({ project, settings, existingPost }: { project: a
         });
     }, [editor]);
 
+    const contextMenuRef = useRef<HTMLDivElement>(null);
+
     const closeContextMenu = useCallback(() => {
         if (contextMenu?.show) setContextMenu(null);
     }, [contextMenu]);
 
     useEffect(() => {
-        document.addEventListener("click", closeContextMenu);
-        return () => document.removeEventListener("click", closeContextMenu);
+        const handler = (e: MouseEvent) => {
+            // Only close if the click is outside the context menu
+            if (contextMenuRef.current && contextMenuRef.current.contains(e.target as Node)) return;
+            closeContextMenu();
+        };
+        document.addEventListener("click", handler);
+        return () => document.removeEventListener("click", handler);
     }, [closeContextMenu]);
 
     // Auto-save draft function
@@ -891,6 +898,7 @@ Genera SOLO el contenido pedido, bien integrado con el contexto, sin repetir lo 
 
                         {contextMenu?.show && (
                             <div
+                                ref={contextMenuRef}
                                 onClick={(e) => e.stopPropagation()}
                                 style={{
                                     position: 'fixed',
