@@ -123,8 +123,8 @@ export function AITiptapEditor({ project, settings, existingPost }: { project: a
         const currentContent = editor.getHTML();
         const { title: rTitle, slug: rSlug, metaTitle: rMetaTitle, metaDesc: rMetaDesc, featuredImage: rFeaturedImage, siteId: rSiteId, categoryId: rCategoryId } = stateRef.current;
 
-        // Don't save if completely empty
-        if (!rTitle.trim() && (!currentContent || currentContent === '<p></p>')) return null;
+        // Don't save if completely empty AND we already have a postId
+        if (!postIdRef.current && !rTitle.trim() && (!currentContent || currentContent === '<p></p>')) return null;
 
         isSavingRef.current = true;
         setSavingDraft(true);
@@ -174,6 +174,58 @@ export function AITiptapEditor({ project, settings, existingPost }: { project: a
         }
         return null;
     }, [editor, project.id, showToast]);
+
+    // Ensures a draft exists in DB and returns the postId
+    // Used before image generation so images always have a valid postId to link to
+    const ensurePostId = useCallback(async (): Promise<string | null> => {
+        if (postIdRef.current) return postIdRef.current;
+        // Force create an empty draft just to get an ID
+        try {
+            const res = await fetch("/api/posts/draft", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    projectId: project.id,
+                    title: stateRef.current.title || "Sin título",
+                    content: editor?.getHTML() || "",
+                    siteId: stateRef.current.siteId || null,
+                })
+            });
+            const data = await res.json();
+            if (data.success && data.post?.id) {
+                postIdRef.current = data.post.id;
+                setPostId(data.post.id);
+                window.history.replaceState(null, '', `/projects/${project.id}/editor/${data.post.id}`);
+                return data.post.id;
+            }
+        } catch (e) {
+            console.error("Error creating draft for image:", e);
+        }
+        return null;
+    }, [editor, project.id]);
+
+    // Saves just the HTML content immediately (used after inserting images)
+    const saveContentNow = useCallback(async () => {
+        if (!editor || !postIdRef.current) return;
+        const content = editor.getHTML();
+        try {
+            await fetch("/api/posts/draft", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    id: postIdRef.current,
+                    projectId: project.id,
+                    title: stateRef.current.title || "Sin título",
+                    content,
+                    featuredImg: stateRef.current.featuredImage,
+                    siteId: stateRef.current.siteId || null,
+                })
+            });
+            setLastSaved(new Date().toLocaleTimeString());
+        } catch (e) {
+            console.error("Error saving content after image insert:", e);
+        }
+    }, [editor, project.id]);
 
     // Debounced auto-save: triggers 1.2 seconds after last change
     const scheduleSave = useCallback(() => {
@@ -368,11 +420,12 @@ export function AITiptapEditor({ project, settings, existingPost }: { project: a
         const textAfter = editor.state.doc.textBetween(pos, Math.min(editor.state.doc.content.size, pos + 500), ' ');
 
         try {
-            // Ensure we have a postId before generating image
-            let currentPostId = postIdRef.current;
+            // Always guarantee a postId exists before image generation
+            const currentPostId = await ensurePostId();
             if (!currentPostId) {
-                const savedPost = await saveDraft();
-                currentPostId = savedPost?.id || null;
+                showToast("No se pudo crear el borrador para guardar la imagen", "error");
+                setLoadingAI(false);
+                return;
             }
 
             const res = await fetch("/api/ai/generate-image", {
@@ -396,8 +449,8 @@ export function AITiptapEditor({ project, settings, existingPost }: { project: a
                     attrs: { src: data.imageUrl, alt: data.altText, class: 'aligncenter' }
                 }).run();
 
-                // Force a save after inserting image
-                await saveDraft();
+                // Save content immediately after inserting image URL
+                await saveContentNow();
             } else {
                 showToast(data.error || "Error al generar imagen", "error");
             }
@@ -415,11 +468,12 @@ export function AITiptapEditor({ project, settings, existingPost }: { project: a
         const textAfter = editor.state.doc.textBetween(pos, Math.min(editor.state.doc.content.size, pos + 500), ' ');
 
         try {
-            // Ensure we have a postId before generating image
-            let currentPostId = postIdRef.current;
+            // Always guarantee a postId exists before image generation
+            const currentPostId = await ensurePostId();
             if (!currentPostId) {
-                const savedPost = await saveDraft();
-                currentPostId = savedPost?.id || null;
+                showToast("No se pudo crear el borrador para guardar la infografía", "error");
+                setLoadingAI(false);
+                return;
             }
 
             const res = await fetch("/api/ai/generate-image", {
@@ -444,8 +498,8 @@ export function AITiptapEditor({ project, settings, existingPost }: { project: a
                     attrs: { src: data.imageUrl, alt: data.altText, class: 'aligncenter' }
                 }).run();
 
-                // Force a save after inserting infographic
-                await saveDraft();
+                // Save content immediately after inserting infographic URL
+                await saveContentNow();
             } else {
                 showToast(data.error || "Error al generar infografía", "error");
             }
