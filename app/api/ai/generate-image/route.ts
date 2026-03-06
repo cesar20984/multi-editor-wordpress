@@ -183,15 +183,11 @@ export async function POST(request: Request) {
             altText = altResponse.choices[0].message.content?.replace(/["']/g, '') || altText;
         } catch (e) { /* keep default alt */ }
 
-        const filename = `img_${Date.now()}_${Math.random().toString(36).substring(7)}.webp`;
-        const filePath = `./public/uploads/${filename}`;
-        const imageUrlPath = `/uploads/${filename}`;
-
-        const fs = require('fs/promises');
-        await fs.writeFile(filePath, webpBuffer);
+        // 4. Convert to Data URL (Base64) for Vercel compatibility
+        const base64Image = `data:image/webp;base64,${webpBuffer.toString("base64")}`;
 
         return NextResponse.json({
-            imageUrl: imageUrlPath,
+            imageUrl: base64Image,
             altText
         });
 
