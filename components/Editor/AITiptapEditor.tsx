@@ -42,6 +42,15 @@ export function AITiptapEditor({ project, settings, existingPost }: { project: a
 
     // Draft auto-save
     const [postId, setPostId] = useState<string | null>(existingPost?.id || null);
+    // Ref to track postId across closures and avoid race conditions
+    const postIdRef = useRef<string | null>(existingPost?.id || null);
+
+    // Update ref whenever state changes (for convenience, though we'll update it manually too)
+    useEffect(() => {
+        postIdRef.current = postId;
+    }, [postId]);
+
+    // Draft auto-save
     const [wpPostId, setWpPostId] = useState<number | null>(existingPost?.wpPostId || null);
     const [savingDraft, setSavingDraft] = useState(false);
     const [lastSaved, setLastSaved] = useState<string | null>(null);
@@ -108,14 +117,14 @@ export function AITiptapEditor({ project, settings, existingPost }: { project: a
 
     // Auto-save draft function
     const saveDraft = useCallback(async () => {
-        if (isSavingRef.current) return;
-        if (!editor) return;
+        if (isSavingRef.current) return null;
+        if (!editor) return null;
 
         const currentContent = editor.getHTML();
         const { title: rTitle, slug: rSlug, metaTitle: rMetaTitle, metaDesc: rMetaDesc, featuredImage: rFeaturedImage, siteId: rSiteId, categoryId: rCategoryId } = stateRef.current;
 
         // Don't save if completely empty
-        if (!rTitle.trim() && (!currentContent || currentContent === '<p></p>')) return;
+        if (!rTitle.trim() && (!currentContent || currentContent === '<p></p>')) return null;
 
         isSavingRef.current = true;
         setSavingDraft(true);
@@ -125,7 +134,7 @@ export function AITiptapEditor({ project, settings, existingPost }: { project: a
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    id: postId,
+                    id: postIdRef.current, // Use Ref to avoid stale closure
                     projectId: project.id,
                     title: rTitle,
                     slug: rSlug,
@@ -139,21 +148,24 @@ export function AITiptapEditor({ project, settings, existingPost }: { project: a
             });
             const data = await res.json();
             if (data.success && data.post) {
-                if (!postId) {
+                if (!postIdRef.current) {
                     // First save: set the postId and update URL
+                    postIdRef.current = data.post.id;
                     setPostId(data.post.id);
                     window.history.replaceState(null, '', `/projects/${project.id}/editor/${data.post.id}`);
                 }
                 const now = new Date();
                 setLastSaved(now.toLocaleTimeString());
+                return data.post;
             }
         } catch (e) {
             console.error("Auto-save error:", e);
+        } finally {
+            isSavingRef.current = false;
+            setSavingDraft(false);
         }
-
-        isSavingRef.current = false;
-        setSavingDraft(false);
-    }, [editor, postId, project.id]);
+        return null;
+    }, [editor, project.id]);
 
     // Debounced auto-save: triggers 1.2 seconds after last change
     const scheduleSave = useCallback(() => {
