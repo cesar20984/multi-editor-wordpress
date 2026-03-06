@@ -6,6 +6,7 @@ import { addSite } from "@/app/actions/site";
 import { syncCategories } from "@/app/actions/category";
 import { getSettings } from "@/app/actions/settings";
 import { ProjectLanguageSelector } from "@/components/ProjectLanguageSelector";
+import { DeleteDraftButton } from "@/components/DeleteDraftButton";
 
 export default async function ProjectPage({ params }: { params: Promise<{ id: string }> }) {
     const resolvedParams = await params;
@@ -141,10 +142,13 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
                                             <td style={{ padding: '1rem 0', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
                                                 {new Date(post.updatedAt).toLocaleDateString()}
                                             </td>
-                                            <td style={{ padding: '1rem 0' }}>
+                                            <td style={{ padding: '1rem 0', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                                                 <Link href={`/projects/${project.id}/editor/${post.id}`} style={{ color: 'var(--accent-color)', fontSize: '0.9rem' }}>
-                                                    Editar
+                                                    ✏️ Editar
                                                 </Link>
+                                                {post.status === 'draft' && (
+                                                    <DeleteDraftButton postId={post.id} postTitle={post.title || ''} />
+                                                )}
                                             </td>
                                         </tr>
                                     ))}
