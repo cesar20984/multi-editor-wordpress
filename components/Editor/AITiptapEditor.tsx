@@ -861,7 +861,7 @@ export function AITiptapEditor({ project, settings, existingPost }: { project: a
                     </div>
                 </div>
 
-                <div className="glass-panel" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                <div className="glass-panel" style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: '80vh' }}>
                     <div style={{ display: 'flex', gap: '1rem', paddingBottom: '1rem', borderBottom: '1px solid var(--glass-border)' }}>
                         <div style={{ flex: 1 }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.2rem' }}>
@@ -892,7 +892,7 @@ export function AITiptapEditor({ project, settings, existingPost }: { project: a
                         </div>
                     </div>
 
-                    <div className={styles.editorWrapper} onContextMenu={handleContextMenu} style={{ flex: 1, overflowY: 'auto', background: '#ffffff', color: '#000000', borderRadius: '0 0 12px 12px' }}>
+                    <div className={styles.editorWrapper} onContextMenu={handleContextMenu} style={{ flex: 1, background: '#ffffff', color: '#000000', borderRadius: '0 0 12px 12px' }}>
                         <div className={styles.toolbar} style={{ opacity: loadingAI ? 0.5 : 1, pointerEvents: loadingAI ? 'none' : 'auto', background: '#f1f1f1', borderBottom: '1px solid #ccc' }}>
                             <button onClick={() => editor.chain().focus().toggleBold().run()} className={`${styles.toolbarBtn} ${editor.isActive('bold') ? styles.toolbarBtnActive : ''}`} style={{ color: '#000' }}>Bold</button>
                             <button onClick={() => editor.chain().focus().toggleItalic().run()} className={`${styles.toolbarBtn} ${editor.isActive('italic') ? styles.toolbarBtnActive : ''}`} style={{ color: '#000' }}>Italic</button>
