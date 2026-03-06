@@ -30,6 +30,9 @@ export function AITiptapEditor({ project, settings, existingPost }: { project: a
     const [aiStep, setAiStep] = useState<string | null>(null);
     const [isPublishing, setIsPublishing] = useState(false);
     const [loadingFeaturedImg, setLoadingFeaturedImg] = useState(false);
+    const [customInstruction, setCustomInstruction] = useState("");
+    const [showCustomInput, setShowCustomInput] = useState(false);
+    const customInputRef = useRef<HTMLInputElement>(null);
 
     // Toast notification system
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
@@ -429,10 +432,6 @@ export function AITiptapEditor({ project, settings, existingPost }: { project: a
         }
         setLoadingAI(false);
     };
-
-    const [customInstruction, setCustomInstruction] = useState("");
-    const [showCustomInput, setShowCustomInput] = useState(false);
-    const customInputRef = useRef<HTMLInputElement>(null);
 
     const handleAICustomInstruction = async () => {
         const { from, to } = editor.state.selection;
