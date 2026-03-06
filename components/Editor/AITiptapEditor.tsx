@@ -462,6 +462,53 @@ export function AITiptapEditor({ project, settings, existingPost }: { project: a
         setLoadingAI(false);
     };
 
+    const handleAIHumanizeSelection = async () => {
+        const { from, to } = editor.state.selection;
+        // Using getHTML for selection is trickier in Tiptap without a custom slice serializer, 
+        // but since this is usually for paragraphs, text is safer for selection. 
+        // Wait, Tiptap has editor.view.state.doc.slice(from, to) which isn't easy to HTMLify.
+        // Let's just use textBetween for selection, or let the user know images won't be kept in partial selection.
+        // Actually, let's use text for selection just like other text tools.
+        const selectedText = editor.state.doc.textBetween(from, to, ' ');
+        if (!selectedText) return;
+
+        setLoadingAI(true);
+        try {
+            const basePrompt = settings?.humanizeSelectionPrompt || "Humaniza el siguiente texto para que parezca escrito por una persona real, no por una IA. Escribe con una voz auténtica, cálida, reflexiva y cercana.";
+            const sys = `${basePrompt}\n\nResponde SOLO con el texto humanizado, sin explicaciones, sin introducciones. Tienes prohibido omitir partes del texto, solo reescríbelo siguiendo la instrucción.`;
+            const result = await generateAIText(selectedText, "custom", sys);
+            editor.chain().focus().insertContentAt({ from, to }, result).run();
+            showToast("✅ Texto humanizado", "success");
+        } catch (error) {
+            console.error(error);
+            showToast("Error al humanizar el texto", "error");
+        }
+        setLoadingAI(false);
+    };
+
+    const handleAIHumanizeArticle = async () => {
+        const fullHTML = editor.getHTML();
+        if (!fullHTML || fullHTML === '<p></p>') return showToast("El editor está vacío.", "error");
+
+        setLoadingAI(true);
+        try {
+            const basePrompt = settings?.humanizeArticlePrompt || "Humaniza el siguiente texto para que parezca escrito por una persona real, no por una IA. Manten las imagenes intactas.";
+            const sys = `${basePrompt}\n\nIMPORTANTE: El input contiene etiquetas HTML (<p>, <h2>, <img src="...">). DEBES mantener TODAS las etiquetas HTML, especialmente las imágenes (<img>). Tu salida debe ser HTML válido sin envolverlo en bloques de markdown (\`\`\`html) ni etiquetas globales como <html> o <body>. Responde SOLO con el HTML humanizado. Tienes prohibido omitir imágenes.`;
+
+            // Using full HTML as the "prompt" for the custom model request
+            const result = await generateAIText(`Reescribe y humaniza este HTML manteniendo las etiquetas:\n\n${fullHTML}`, "custom", sys);
+
+            // Result comes back as HTML. Clean possible markdown wrapping just in case.
+            const cleanResult = result.replace(/```html\n?/gi, '').replace(/```\n?/gi, '').trim();
+            editor.commands.setContent(cleanResult);
+            showToast("✅ Artículo completo humanizado", "success");
+        } catch (error) {
+            console.error(error);
+            showToast("Error al humanizar el artículo completo", "error");
+        }
+        setLoadingAI(false);
+    };
+
     const handleAIGenerateImage = async (pos: number) => {
         setLoadingAI(true);
         const textBefore = editor.state.doc.textBetween(Math.max(0, pos - 500), pos, ' ');
@@ -803,9 +850,14 @@ export function AITiptapEditor({ project, settings, existingPost }: { project: a
                                 />
                             </details>
                         </div>
-                        <button onClick={handleAIGenerateArticle} disabled={loadingAI} className="btn-primary" style={{ padding: '0.6rem 1rem' }}>
-                            Generar Todo
-                        </button>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                            <button onClick={handleAIGenerateArticle} disabled={loadingAI} className="btn-primary" style={{ padding: '0.6rem 1rem' }}>
+                                Generar Todo
+                            </button>
+                            <button onClick={handleAIHumanizeArticle} disabled={loadingAI} className="btn-primary" style={{ padding: '0.4rem 1rem', background: 'linear-gradient(135deg, #10b981, #059669)', fontSize: '0.8rem' }} title="Reescribe TODO el artículo para sonar más humano, manteniendo las imágenes">
+                                👤 Humanizar Todo
+                            </button>
+                        </div>
                     </div>
                 </div>
 
@@ -859,6 +911,11 @@ export function AITiptapEditor({ project, settings, existingPost }: { project: a
                                         style={{ background: 'linear-gradient(135deg, #3b82f6, #2563eb)', boxShadow: '0 2px 10px rgba(59,130,246,0.3)' }}
                                         title="Solo corrige errores ortográficos, sin cambiar el texto">
                                         🔤 Ortografía
+                                    </button>
+                                    <button className={styles.aiBtn} onClick={handleAIHumanizeSelection} disabled={loadingAI}
+                                        style={{ background: 'linear-gradient(135deg, #10b981, #059669)', boxShadow: '0 2px 10px rgba(16,185,129,0.3)' }}
+                                        title="Reescribe el texto seleccionado para que suene más cálido y humano">
+                                        👤 Humanizar
                                     </button>
                                     <button className={styles.aiBtn} onClick={() => { setShowCustomInput(v => !v); setTimeout(() => customInputRef.current?.focus(), 50); }} disabled={loadingAI}
                                         style={{ background: 'linear-gradient(135deg, #8b5cf6, #7c3aed)', boxShadow: '0 2px 10px rgba(139,92,246,0.3)' }}

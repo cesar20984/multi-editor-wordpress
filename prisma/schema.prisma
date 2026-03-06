@@ -94,4 +94,6 @@ model Setting {
   imageAspectRatio      String   @default("1:1")
   language              String   @default("Español")
   insertContentPrompt   String   @default("Actúa como un experto redactor. Genera el contenido exacto que pide la instrucción: '{INSTRUCTION}'. El contenido se insertará en el medio de un artículo, por lo que debe conectar fluidamente con el texto anterior y posterior.\n\nTEXTO ANTERIOR:\n{BEFORE}\n\nTEXTO POSTERIOR:\n{AFTER}\n\nGenera SOLO el fragmento de código HTML (p, h2, h3, ul, li) del nuevo contenido. No repitas información existente. No incluyas etiquetas raiz como html o body.")
+  humanizeArticlePrompt String   @default("Humaniza el siguiente texto para que parezca escrito por una persona real, no por una IA. Escribe con una voz auténtica, cálida, reflexiva y cercana. Mantén el significado original y TODO el formato HTML, especialmente las imágenes (<img>). El resultado debe sentirse vivo, creíble y con alma. Tu única tarea es devolver el HTML ya humanizado.")
+  humanizeSelectionPrompt String @default("Humaniza el siguiente texto para que parezca escrito por una persona real, no por una IA. Escribe con una voz auténtica, cálida, reflexiva y cercana. Evita sonar robótico o genérico. Tu única tarea es devolver el texto humanizado manteniendo su estructura HTML interna si la tiene.")
 }

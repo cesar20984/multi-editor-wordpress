@@ -24,6 +24,8 @@ export default function SettingsPage() {
     const [defaultInternalImagePrompt, setDefaultInternalImagePrompt] = useState("");
     const [defaultInfographicPrompt, setDefaultInfographicPrompt] = useState("");
     const [insertContentPrompt, setInsertContentPrompt] = useState("");
+    const [humanizeArticlePrompt, setHumanizeArticlePrompt] = useState("");
+    const [humanizeSelectionPrompt, setHumanizeSelectionPrompt] = useState("");
 
     useEffect(() => {
         fetch("/api/settings")
@@ -45,6 +47,8 @@ export default function SettingsPage() {
                 setDefaultInternalImagePrompt(data.settings.defaultInternalImagePrompt);
                 setDefaultInfographicPrompt(data.settings.defaultInfographicPrompt);
                 setInsertContentPrompt(data.settings.insertContentPrompt || "");
+                setHumanizeArticlePrompt(data.settings.humanizeArticlePrompt || "");
+                setHumanizeSelectionPrompt(data.settings.humanizeSelectionPrompt || "");
                 setLoading(false);
             });
     }, []);
@@ -72,6 +76,8 @@ export default function SettingsPage() {
                 defaultInternalImagePrompt,
                 defaultInfographicPrompt,
                 insertContentPrompt,
+                humanizeArticlePrompt,
+                humanizeSelectionPrompt,
             })
         });
 
@@ -284,6 +290,31 @@ export default function SettingsPage() {
                         Controla cómo la IA genera el contenido al usar <b>✍️ Insertar Contenido</b> desde el menú de clic derecho.
                         El sistema le pasa automáticamente el idioma del proyecto y el contexto del artículo.
                     </p>
+                </div>
+
+                <div>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: "bold" }}>👤 Humanizar Artículo Completo</label>
+                    <textarea
+                        name="humanizeArticlePrompt"
+                        rows={4}
+                        value={humanizeArticlePrompt}
+                        onChange={e => setHumanizeArticlePrompt(e.target.value)}
+                        style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid var(--glass-border)', borderRadius: '8px', color: 'var(--text-primary)' }}
+                    />
+                    <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
+                        Transforma el HTML completo del artículo. Es crítico instruir al bot a <b>no modificar ni borrar etiquetas <code>&lt;img&gt;</code></b> para preservar las imágenes.
+                    </p>
+                </div>
+
+                <div>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: "bold" }}>👤 Humanizar Texto Resaltado (Popup)</label>
+                    <textarea
+                        name="humanizeSelectionPrompt"
+                        rows={4}
+                        value={humanizeSelectionPrompt}
+                        onChange={e => setHumanizeSelectionPrompt(e.target.value)}
+                        style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid var(--glass-border)', borderRadius: '8px', color: 'var(--text-primary)' }}
+                    />
                 </div>
 
                 <button type="submit" className="btn-primary" disabled={saving} style={{ padding: '1rem', fontSize: '1.1rem', marginTop: '1rem' }}>

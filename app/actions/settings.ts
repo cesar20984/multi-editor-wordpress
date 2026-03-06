@@ -26,6 +26,8 @@ export async function saveSettings(formData: FormData) {
             textModel: formData.get("textModel") as string,
             imageModel: formData.get("imageModel") as string,
             insertContentPrompt: formData.get("insertContentPrompt") as string,
+            humanizeArticlePrompt: formData.get("humanizeArticlePrompt") as string,
+            humanizeSelectionPrompt: formData.get("humanizeSelectionPrompt") as string,
         }
     });
 

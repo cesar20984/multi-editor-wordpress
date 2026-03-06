@@ -74,7 +74,8 @@ export async function POST(request: Request) {
         const {
             id, textModel, imageModel, imageSize, imageAspectRatio, language,
             defaultArticlePrompt, defaultTitlePrompt, defaultMetaTitlePrompt, defaultMetaDescPrompt,
-            defaultImagePrompt, defaultInternalImagePrompt, defaultInfographicPrompt, insertContentPrompt
+            defaultImagePrompt, defaultInternalImagePrompt, defaultInfographicPrompt, insertContentPrompt,
+            humanizeArticlePrompt, humanizeSelectionPrompt
         } = body;
 
         const updated = await prisma.setting.update({
@@ -93,6 +94,8 @@ export async function POST(request: Request) {
                 defaultInternalImagePrompt,
                 defaultInfographicPrompt,
                 ...(insertContentPrompt !== undefined && { insertContentPrompt }),
+                ...(humanizeArticlePrompt !== undefined && { humanizeArticlePrompt }),
+                ...(humanizeSelectionPrompt !== undefined && { humanizeSelectionPrompt }),
             }
         });
 
