@@ -1,0 +1,850 @@
+"use client";
+
+import { useEditor, EditorContent } from '@tiptap/react';
+import { BubbleMenu } from '@tiptap/react/menus';
+import StarterKit from '@tiptap/starter-kit';
+import Placeholder from '@tiptap/extension-placeholder';
+import Image from '@tiptap/extension-image';
+import styles from './AITiptapEditor.module.css';
+import { useState, useCallback, useEffect, useRef } from 'react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+
+interface ExistingPost {
+    id: string;
+    title: string | null;
+    slug: string | null;
+    metaTitle: string | null;
+    metaDesc: string | null;
+    content: string | null;
+    featuredImg: string | null;
+    wpPostId: number | null;
+    siteId: string | null;
+    categoryId: string | null;
+}
+
+export function AITiptapEditor({ project, settings, existingPost }: { project: any, settings: any, existingPost?: ExistingPost }) {
+    const router = useRouter();
+    const [contextMenu, setContextMenu] = useState<{ x: number; y: number; show: boolean; pos: number } | null>(null);
+    const [loadingAI, setLoadingAI] = useState(false);
+    const [aiStep, setAiStep] = useState<string | null>(null);
+    const [isPublishing, setIsPublishing] = useState(false);
+    const [loadingFeaturedImg, setLoadingFeaturedImg] = useState(false);
+
+    // Toast notification system
+    const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+    const toastTimerRef = useRef<NodeJS.Timeout | null>(null);
+    const showToast = useCallback((message: string, type: 'success' | 'error' | 'info' = 'info') => {
+        setToast({ message, type });
+        if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+        toastTimerRef.current = setTimeout(() => setToast(null), 5000);
+    }, []);
+
+    // Draft auto-save
+    const [postId, setPostId] = useState<string | null>(existingPost?.id || null);
+    const [wpPostId, setWpPostId] = useState<number | null>(existingPost?.wpPostId || null);
+    const [savingDraft, setSavingDraft] = useState(false);
+    const [lastSaved, setLastSaved] = useState<string | null>(null);
+    const saveTimerRef = useRef<NodeJS.Timeout | null>(null);
+    const isSavingRef = useRef(false);
+
+    // AI Generation States
+    const [topic, setTopic] = useState("");
+    const [articlePrompt, setArticlePrompt] = useState(settings?.defaultArticlePrompt || "Escribe un artículo detallado sobre...");
+
+    // Form states
+    const [title, setTitle] = useState(existingPost?.title || "");
+    const [slug, setSlug] = useState(existingPost?.slug || "");
+    const [metaTitle, setMetaTitle] = useState(existingPost?.metaTitle || "");
+    const [metaDesc, setMetaDesc] = useState(existingPost?.metaDesc || "");
+
+    // Featured image
+    const [featuredImage, setFeaturedImage] = useState<string | null>(existingPost?.featuredImg || null);
+    const [featuredImageAlt, setFeaturedImageAlt] = useState(existingPost?.title || "");
+
+    // Default siteId to the first site if available
+    const [siteId, setSiteId] = useState(existingPost?.siteId || (project.sites.length > 0 ? project.sites[0].id : ""));
+    const [categoryId, setCategoryId] = useState(existingPost?.categoryId || "");
+
+    // Ref to store the latest values of all fields to avoid stale closures in saveDraft
+    const stateRef = useRef({ title, slug, metaTitle, metaDesc, featuredImage, siteId, categoryId });
+
+    // Update the ref whenever any of the fields change
+    useEffect(() => {
+        stateRef.current = { title, slug, metaTitle, metaDesc, featuredImage, siteId, categoryId };
+    }, [title, slug, metaTitle, metaDesc, featuredImage, siteId, categoryId]);
+
+    const editor = useEditor({
+        extensions: [
+            StarterKit,
+            Image,
+            Placeholder.configure({
+                placeholder: 'Escribe tu publicación aquí, o selecciona texto para usar IA...',
+            }),
+        ],
+        content: existingPost?.content || '',
+        immediatelyRender: false,
+    });
+
+    const handleContextMenu = useCallback((e: React.MouseEvent) => {
+        e.preventDefault();
+        if (!editor) return;
+        setContextMenu({
+            x: e.clientX,
+            y: e.clientY,
+            show: true,
+            pos: editor.state.selection.from
+        });
+    }, [editor]);
+
+    const closeContextMenu = useCallback(() => {
+        if (contextMenu?.show) setContextMenu(null);
+    }, [contextMenu]);
+
+    useEffect(() => {
+        document.addEventListener("click", closeContextMenu);
+        return () => document.removeEventListener("click", closeContextMenu);
+    }, [closeContextMenu]);
+
+    // Auto-save draft function
+    const saveDraft = useCallback(async () => {
+        if (isSavingRef.current) return;
+        if (!editor) return;
+
+        const currentContent = editor.getHTML();
+        const { title: rTitle, slug: rSlug, metaTitle: rMetaTitle, metaDesc: rMetaDesc, featuredImage: rFeaturedImage, siteId: rSiteId, categoryId: rCategoryId } = stateRef.current;
+
+        // Don't save if completely empty
+        if (!rTitle.trim() && (!currentContent || currentContent === '<p></p>')) return;
+
+        isSavingRef.current = true;
+        setSavingDraft(true);
+
+        try {
+            const res = await fetch("/api/posts/draft", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    id: postId,
+                    projectId: project.id,
+                    title: rTitle,
+                    slug: rSlug,
+                    metaTitle: rMetaTitle,
+                    metaDesc: rMetaDesc,
+                    content: currentContent,
+                    featuredImg: rFeaturedImage,
+                    siteId: rSiteId || null,
+                    categoryId: rCategoryId || null,
+                })
+            });
+            const data = await res.json();
+            if (data.success && data.post) {
+                if (!postId) {
+                    // First save: set the postId and update URL
+                    setPostId(data.post.id);
+                    window.history.replaceState(null, '', `/projects/${project.id}/editor/${data.post.id}`);
+                }
+                const now = new Date();
+                setLastSaved(now.toLocaleTimeString());
+            }
+        } catch (e) {
+            console.error("Auto-save error:", e);
+        }
+
+        isSavingRef.current = false;
+        setSavingDraft(false);
+    }, [editor, postId, project.id]);
+
+    // Debounced auto-save: triggers 1.2 seconds after last change
+    const scheduleSave = useCallback(() => {
+        if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+        saveTimerRef.current = setTimeout(() => {
+            saveDraft();
+        }, 1200);
+    }, [saveDraft]);
+
+    // Watch for content changes in editor
+    useEffect(() => {
+        if (!editor) return;
+        const handler = () => scheduleSave();
+        editor.on('update', handler);
+        return () => { editor.off('update', handler); };
+    }, [editor, scheduleSave]);
+
+    // Watch for form field changes
+    useEffect(() => {
+        scheduleSave();
+    }, [title, slug, metaTitle, metaDesc, siteId, categoryId, featuredImage]);
+
+    if (!editor) {
+        return null;
+    }
+
+    const selectedSite = project.sites.find((s: any) => s.id === siteId);
+
+    // AI Text Generation Helper
+    const generateAIText = async (promptText: string, type: "rewrite" | "custom", sysMessage?: string) => {
+        const res = await fetch("/api/ai/generate-text", {
+            method: "POST",
+            body: JSON.stringify({
+                prompt: promptText,
+                type,
+                context: type === "rewrite" ? "" : (editor?.getText() || ""),
+                systemMessage: sysMessage,
+                model: settings?.textModel || "gpt-4o-mini"
+            }),
+            headers: { "Content-Type": "application/json" }
+        });
+        const data = await res.json();
+        if (data.error) throw new Error(data.error);
+        return data.text;
+    };
+
+    const handleAIGenerateArticle = async () => {
+        if (!topic.trim()) return showToast("Por favor ingresa una temática para el artículo.", "error");
+        setLoadingAI(true);
+        const lang = project.language || settings?.language || "Español";
+
+        try {
+            // Step 1: Generate Article Content
+            setAiStep("✍️ Generando artículo...");
+            const prompt = `${articlePrompt}\n\nTemática: ${topic}\n\nIdioma: ${lang}`;
+            const generatedHtml = await generateAIText(prompt, "custom", `Eres un redactor experto para blogs de WordPress. Escribe TODO el contenido en ${lang}. Usa etiquetas HTML apropiadas (h2, h3, p, strong, ul, li). No uses etiquetas html de nivel raiz, ni head, ni body. Solo el contenido principal.`);
+            editor.commands.setContent(generatedHtml);
+
+            // Step 2: Generate Title (should include keyword)
+            setAiStep("📌 Generando título...");
+            const titleSys = (settings?.defaultTitlePrompt || "Eres un experto en SEO. Genera solo un título optimizado (H1). Sin comillas.") + ` Escribe en ${lang}. MUY IMPORTANTE: El título debe centrarse en el tema: "${topic}". Si el tema es una instrucción, extrae la idea principal y haz un título real. NO repitas la instrucción original.`;
+            const genTitle = await generateAIText(`Base content context details: ${editor.getText().slice(0, 1500)}`, "custom", titleSys);
+            setTitle(genTitle.replace(/["']/g, '').replace(/^Título:|^Title:/i, '').trim());
+
+            // Step 3: Generate Meta Title (should include keyword, catchy but correct)
+            setAiStep("🏷️ Generando meta título...");
+            const metaTitleSys = (settings?.defaultMetaTitlePrompt || "Genera solo el meta título directo para Google. Sin comillas.") + ` Escribe en ${lang}. Debe ser un Meta Título profesional sobre "${topic}". NO repitas instrucciones.`;
+            const genMetaTitle = await generateAIText(`Base content context details: ${editor.getText().slice(0, 1500)}`, "custom", metaTitleSys);
+            setMetaTitle(genMetaTitle.replace(/["']/g, '').replace(/^Meta Título:|^Meta Title:/i, '').trim());
+
+            // Step 4: Generate Slug (very concise)
+            setAiStep("🔗 Generando URL...");
+            const slugSys = `Genera un slug de URL (3-4 palabras) basado en el tema: "${topic}". Minúsculas, guiones, SOLO el slug. Sin prefijos.`;
+            const genSlug = await generateAIText(`Contenido: ${genTitle}`, "custom", slugSys);
+            setSlug(genSlug.toLowerCase().replace(/["']/g, '').replace(/^Slug:|^URL:/i, '').replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-').trim());
+
+            // Step 5: Generate Meta Description
+            setAiStep("📝 Generando meta descripción...");
+            const metaDescSys = (settings?.defaultMetaDescPrompt || "Genera solo la meta descripción directa.") + ` Escribe en ${lang}.`;
+            const genMetaDesc = await generateAIText(`Base content context details: ${editor.getText().slice(0, 1500)}`, "custom", metaDescSys);
+            setMetaDesc(genMetaDesc.replace(/["']/g, '').replace(/^Meta Descripción:|^Meta Description:/i, '').trim());
+
+            // Dismiss overlay - let user work while image generates
+            setAiStep(null);
+            setLoadingAI(false);
+            showToast("✨ ¡Textos generados! La imagen destacada se está generando...", "success");
+
+            // Update ref manually for the immediate save
+            stateRef.current = {
+                ...stateRef.current,
+                title: genTitle.replace(/["']/g, '').replace(/^Título:|^Title:/i, '').trim(),
+                slug: genSlug.toLowerCase().replace(/["']/g, '').replace(/^Slug:|^URL:/i, '').replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-').trim(),
+                metaTitle: genMetaTitle.replace(/["']/g, '').replace(/^Meta Título:|^Meta Title:/i, '').trim(),
+                metaDesc: genMetaDesc.replace(/["']/g, '').replace(/^Meta Descripción:|^Meta Description:/i, '').trim()
+            };
+            saveDraft();
+
+            // Step 5: Generate Featured Image in background
+            setLoadingFeaturedImg(true);
+            try {
+                const imgRes = await fetch("/api/ai/generate-image", {
+                    method: "POST",
+                    body: JSON.stringify({
+                        contextBefore: `Título del artículo: ${genTitle}\n\nResumen del contenido: ${editor.getText().slice(0, 800)}`,
+                        contextAfter: "",
+                        wordPressSiteId: siteId,
+                        model: settings?.imageModel || "dall-e-3",
+                        isFeatured: true,
+                        imageSize: settings?.imageSize || "1K",
+                        imageAspectRatio: settings?.imageAspectRatio || "1:1",
+                        language: lang
+                    }),
+                    headers: { "Content-Type": "application/json" }
+                });
+                const imgData = await imgRes.json();
+                if (imgData.imageUrl) {
+                    setFeaturedImage(imgData.imageUrl);
+                    setFeaturedImageAlt(imgData.altText || genTitle);
+
+                    // Force a save after setting the featured image
+                    stateRef.current.featuredImage = imgData.imageUrl;
+                    saveDraft();
+                    showToast("🖼️ ¡Imagen destacada generada!", "success");
+                }
+            } catch (imgErr) {
+                console.error("Error generando imagen destacada:", imgErr);
+                showToast("Error generando imagen destacada", "error");
+            }
+            setLoadingFeaturedImg(false);
+            return; // already set loadingAI false above
+        } catch (error) {
+            console.error(error);
+            setAiStep(null);
+            showToast("Error al generar artículo. Inténtalo de nuevo.", "error");
+        }
+        setLoadingAI(false);
+    };
+
+    const handleAIGenerateField = async (field: "title" | "metaTitle" | "metaDesc" | "slug") => {
+        setLoadingAI(true);
+        try {
+            const editorText = editor.getText();
+            const lang = project.language || settings?.language || "Español";
+            let sys = "";
+            if (field === "title") sys = (settings?.defaultTitlePrompt || "Genera solo un título SEO directo, sin comillas.") + ` Escribe en ${lang}. MUY IMPORTANTE: Incluye la palabra clave o tema principal: "${topic || editorText.slice(0, 30)}".`;
+            if (field === "metaTitle") sys = (settings?.defaultMetaTitlePrompt || "Genera solo el meta título directo, sin comillas.") + ` Escribe en ${lang}. Incluye la palabra clave "${topic || editorText.slice(0, 30)}", sea llamativo pero correcto.`;
+            if (field === "metaDesc") sys = (settings?.defaultMetaDescPrompt || "Genera solo la meta descripción directa, sin comillas.") + ` Escribe en ${lang}.`;
+            if (field === "slug") sys = `Genera un slug de URL para WordPress MUY resumido (3-4 palabras), minúsculas y separado por guiones. Tema: ${topic || title || editorText.slice(0, 30)}. Idioma: ${lang}. Responde SOLO el slug.`;
+
+            const req = `Base content context details: ${editorText.slice(0, 1500)}`;
+            const result = await generateAIText(req, "custom", sys);
+
+            if (field === "title") setTitle(result.replace(/["']/g, '').trim());
+            if (field === "metaTitle") setMetaTitle(result.replace(/["']/g, '').trim());
+            if (field === "metaDesc") setMetaDesc(result.replace(/["']/g, '').trim());
+            if (field === "slug") setSlug(result.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-').trim());
+        } catch (error) {
+            console.error(error);
+            showToast(`Error al generar ${field}`, "error");
+        }
+        setLoadingAI(false);
+    };
+
+    const handleAIImprove = async () => {
+        const { from, to } = editor.state.selection;
+        const selectedText = editor.state.doc.textBetween(from, to, ' ');
+        if (!selectedText) return;
+
+        setLoadingAI(true);
+        try {
+            // Only send the selected text, no article context
+            const result = await generateAIText(selectedText, "rewrite");
+            editor.chain().focus().insertContentAt({ from, to }, result).run();
+        } catch (error) {
+            console.error(error);
+            alert("Error al mejorar texto");
+        }
+        setLoadingAI(false);
+    };
+
+    const handleAIGenerateImage = async (pos: number) => {
+        setLoadingAI(true);
+        const textBefore = editor.state.doc.textBetween(Math.max(0, pos - 500), pos, ' ');
+        const textAfter = editor.state.doc.textBetween(pos, Math.min(editor.state.doc.content.size, pos + 500), ' ');
+
+        try {
+            const res = await fetch("/api/ai/generate-image", {
+                method: "POST",
+                body: JSON.stringify({
+                    contextBefore: textBefore,
+                    contextAfter: textAfter,
+                    wordPressSiteId: siteId,
+                    model: settings?.imageModel || "dall-e-3",
+                    imageSize: settings?.imageSize || "1K",
+                    imageAspectRatio: settings?.imageAspectRatio || "1:1",
+                    language: project.language || settings?.language || "Español"
+                }),
+                headers: { "Content-Type": "application/json" }
+            });
+            const data = await res.json();
+            if (data.imageUrl) {
+                editor.chain().focus().insertContentAt(pos, {
+                    type: 'image',
+                    attrs: { src: data.imageUrl, alt: data.altText, class: 'aligncenter' }
+                }).run();
+
+                // Force a save after inserting image
+                // The editor content change will trigger scheduleSave, which will pick up the latest content.
+                // No need to manually update stateRef.current for editor content.
+                saveDraft();
+            } else {
+                alert(data.error || "Error al generar imagen");
+            }
+        } catch (error) {
+            console.error(error);
+            showToast("Error al generar imagen", "error");
+        }
+        setLoadingAI(false);
+    };
+
+    // Infographic generation at cursor position
+    const handleAIGenerateInfographic = async (pos: number) => {
+        setLoadingAI(true);
+        const textBefore = editor.state.doc.textBetween(Math.max(0, pos - 500), pos, ' ');
+        const textAfter = editor.state.doc.textBetween(pos, Math.min(editor.state.doc.content.size, pos + 500), ' ');
+
+        try {
+            const res = await fetch("/api/ai/generate-image", {
+                method: "POST",
+                body: JSON.stringify({
+                    contextBefore: textBefore,
+                    contextAfter: textAfter,
+                    wordPressSiteId: siteId,
+                    model: settings?.imageModel || "dall-e-3",
+                    imageSize: settings?.imageSize || "1K",
+                    imageAspectRatio: settings?.imageAspectRatio || "1:1",
+                    language: project.language || settings?.language || "Español",
+                    isInfographic: true
+                }),
+                headers: { "Content-Type": "application/json" }
+            });
+            const data = await res.json();
+            if (data.imageUrl) {
+                editor.chain().focus().insertContentAt(pos, {
+                    type: 'image',
+                    attrs: { src: data.imageUrl, alt: data.altText, class: 'aligncenter' }
+                }).run();
+
+                // Force a save after inserting infographic
+                // The editor content change will trigger scheduleSave, which will pick up the latest content.
+                // No need to manually update stateRef.current for editor content.
+                saveDraft();
+            } else {
+                showToast(data.error || "Error al generar infografía", "error");
+            }
+        } catch (error) {
+            console.error(error);
+        }
+        setLoadingAI(false);
+    };
+
+    // Featured Image Generation
+    const handleGenerateFeaturedImage = async () => {
+        if (!editor.getText().trim() && !title.trim()) {
+            return alert("Escribe contenido o un título primero para generar la imagen destacada.");
+        }
+        setLoadingFeaturedImg(true);
+        try {
+            const context = title || editor.getText().slice(0, 500);
+            const res = await fetch("/api/ai/generate-image", {
+                method: "POST",
+                body: JSON.stringify({
+                    contextBefore: `Título del artículo: ${title}\n\nResumen del contenido: ${editor.getText().slice(0, 800)}`,
+                    contextAfter: "",
+                    wordPressSiteId: siteId,
+                    model: settings?.imageModel || "dall-e-3",
+                    isFeatured: true,
+                    imageSize: settings?.imageSize || "1K",
+                    imageAspectRatio: settings?.imageAspectRatio || "1:1",
+                    language: project.language || settings?.language || "Español"
+                }),
+                headers: { "Content-Type": "application/json" }
+            });
+            const data = await res.json();
+            if (data.imageUrl) {
+                setFeaturedImage(data.imageUrl);
+                setFeaturedImageAlt(data.altText || title || "Imagen destacada del artículo");
+
+                // Force a save after setting the featured image
+                stateRef.current.featuredImage = data.imageUrl;
+                saveDraft();
+            } else {
+                showToast(data.error || "Error al generar imagen destacada", "error");
+            }
+        } catch (error) {
+            console.error(error);
+            showToast("Error al generar imagen destacada", "error");
+        }
+        setLoadingFeaturedImg(false);
+    };
+
+    // Handle manual featured image upload
+    const handleFeaturedImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = () => {
+            setFeaturedImage(reader.result as string);
+            setFeaturedImageAlt(title || file.name.replace(/\.[^/.]+$/, ""));
+        };
+        reader.readAsDataURL(file);
+    };
+
+    const handlePublish = async () => {
+        if (!siteId) {
+            showToast("⚠️ Debes seleccionar un Sitio de publicación.", "error");
+            return;
+        }
+        if (!categoryId) {
+            showToast("⚠️ Debes seleccionar una Categoría para publicar.", "error");
+            return;
+        }
+        setIsPublishing(true);
+
+        const formData = new FormData();
+        formData.append("projectId", project.id);
+        formData.append("siteId", siteId);
+        formData.append("categoryId", categoryId);
+        formData.append("title", title);
+        formData.append("slug", slug);
+        formData.append("metaTitle", metaTitle);
+        formData.append("metaDesc", metaDesc);
+        formData.append("content", editor.getHTML());
+        if (postId) {
+            formData.append("postId", postId);
+        }
+        if (wpPostId) {
+            formData.append("wpPostId", String(wpPostId));
+        }
+        if (featuredImage) {
+            formData.append("featuredImage", featuredImage);
+            formData.append("featuredImageAlt", featuredImageAlt);
+        }
+
+        try {
+            const res = await fetch("/api/wp/publish", {
+                method: "POST",
+                body: formData
+            });
+            const result = await res.json();
+
+            if (result.success) {
+                if (result.wpPostId) {
+                    setWpPostId(result.wpPostId);
+                }
+                showToast(wpPostId ? "✅ ¡Actualizado Exitosamente en WordPress!" : "🚀 ¡Publicado Exitosamente en WordPress!", "success");
+                setTimeout(() => { window.location.href = `/projects/${project.id}`; }, 2000);
+            } else {
+                showToast("Error publicando: " + result.error, "error");
+            }
+        } catch (err: any) {
+            showToast("Error en el cliente al publicar.", "error");
+            console.error(err);
+        }
+        setIsPublishing(false);
+    };
+
+    // Toast styles
+    const toastStyles: Record<string, React.CSSProperties> = {
+        success: { background: 'linear-gradient(135deg, #10b981, #059669)', borderColor: '#059669' },
+        error: { background: 'linear-gradient(135deg, #ef4444, #dc2626)', borderColor: '#dc2626' },
+        info: { background: 'linear-gradient(135deg, #3b82f6, #2563eb)', borderColor: '#2563eb' },
+    };
+
+    return (
+        <>
+            {/* Toast Notification */}
+            {toast && (
+                <div style={{
+                    position: 'fixed', top: '1.5rem', right: '1.5rem', zIndex: 9999,
+                    padding: '1rem 1.5rem', borderRadius: '12px', color: '#fff',
+                    boxShadow: '0 8px 32px rgba(0,0,0,0.3)', fontSize: '0.95rem', fontWeight: 500,
+                    display: 'flex', alignItems: 'center', gap: '0.75rem', minWidth: '300px',
+                    animation: 'slideIn 0.3s ease-out',
+                    border: '1px solid', ...toastStyles[toast.type]
+                }}>
+                    <span style={{ fontSize: '1.3rem' }}>{toast.type === 'success' ? '✅' : toast.type === 'error' ? '❌' : 'ℹ️'}</span>
+                    <span style={{ flex: 1 }}>{toast.message}</span>
+                    <button onClick={() => setToast(null)} style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer', fontSize: '1.2rem', opacity: 0.7 }}>×</button>
+                </div>
+            )}
+
+            {/* AI Progress Overlay */}
+            {aiStep && (
+                <div style={{
+                    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9998,
+                    background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center'
+                }}>
+                    <div style={{
+                        background: 'linear-gradient(135deg, rgba(15,23,42,0.95), rgba(30,41,59,0.95))',
+                        border: '1px solid var(--glass-border)', borderRadius: '16px',
+                        padding: '2.5rem 3rem', textAlign: 'center',
+                        boxShadow: '0 20px 60px rgba(0,0,0,0.5)'
+                    }}>
+                        <div style={{ fontSize: '3rem', marginBottom: '1rem', animation: 'pulse 1.5s ease-in-out infinite' }}>✨</div>
+                        <p style={{ fontSize: '1.2rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '0.5rem' }}>Generando con IA</p>
+                        <p style={{ fontSize: '1rem', color: 'var(--accent-color)' }}>{aiStep}</p>
+                        <div style={{ marginTop: '1.5rem', height: '4px', background: 'rgba(255,255,255,0.1)', borderRadius: '2px', overflow: 'hidden' }}>
+                            <div style={{ height: '100%', background: 'var(--accent-color)', borderRadius: '2px', animation: 'loading 2s ease-in-out infinite', width: '60%' }} />
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            <style>{`
+                @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+                @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.1); } }
+                @keyframes loading { 0% { transform: translateX(-100%); } 100% { transform: translateX(200%); } }
+            `}</style>
+
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <Link href={`/projects/${project.id}`} style={{ color: 'var(--accent-color)' }}>
+                        &larr; Volver al Proyecto
+                    </Link>
+                    <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        {savingDraft && <span style={{ color: '#f59e0b' }}>⛏ Guardando borrador...</span>}
+                        {!savingDraft && lastSaved && <span style={{ color: 'var(--success-color)' }}>✓ Guardado {lastSaved}</span>}
+                        {existingPost?.wpPostId && <span style={{ background: 'rgba(16,185,129,0.2)', color: 'var(--success-color)', padding: '0.15rem 0.5rem', borderRadius: '8px', fontSize: '0.75rem' }}>WP #{existingPost.wpPostId}</span>}
+                    </div>
+                </div>
+
+                <div className="glass-panel" style={{ padding: '1rem' }}>
+                    <h3 style={{ marginBottom: '0.5rem', display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                        <span>✨ Generar Artículo con IA</span>
+                        {loadingAI && <span style={{ fontSize: '0.8rem', color: 'var(--accent-color)' }}>Procesando...</span>}
+                    </h3>
+                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-start' }}>
+                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                            <input
+                                type="text"
+                                placeholder="Tema o idea principal del artículo..."
+                                value={topic}
+                                onChange={(e) => setTopic(e.target.value)}
+                                style={{ width: '100%', padding: '0.5rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid var(--glass-border)', borderRadius: '6px', color: 'var(--text-primary)' }}
+                            />
+                            <details style={{ fontSize: '0.85rem' }}>
+                                <summary style={{ cursor: 'pointer', color: 'var(--text-secondary)' }}>Ver/Editar Prompt Predeterminado</summary>
+                                <textarea
+                                    value={articlePrompt}
+                                    onChange={(e) => setArticlePrompt(e.target.value)}
+                                    rows={2}
+                                    style={{ width: '100%', padding: '0.5rem', marginTop: '0.5rem', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--glass-border)', borderRadius: '6px', color: 'var(--text-secondary)', fontSize: '0.8rem' }}
+                                />
+                            </details>
+                        </div>
+                        <button onClick={handleAIGenerateArticle} disabled={loadingAI} className="btn-primary" style={{ padding: '0.6rem 1rem' }}>
+                            Generar Todo
+                        </button>
+                    </div>
+                </div>
+
+                <div className="glass-panel" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                    <div style={{ display: 'flex', gap: '1rem', paddingBottom: '1rem', borderBottom: '1px solid var(--glass-border)' }}>
+                        <div style={{ flex: 1 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.2rem' }}>
+                                <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Título (H1)</span>
+                                <button onClick={() => handleAIGenerateField("title")} disabled={loadingAI} style={{ background: 'none', border: 'none', color: 'var(--accent-color)', cursor: 'pointer', fontSize: '0.8rem' }}>✨ Generar con IA</button>
+                            </div>
+                            <input
+                                id="post-title"
+                                type="text"
+                                placeholder="Escribe un título..."
+                                value={title}
+                                onChange={(e) => setTitle(e.target.value)}
+                                style={{ width: '100%', fontSize: '1.2rem', fontWeight: 'bold', padding: '0.5rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid var(--glass-border)', borderRadius: '6px', outline: 'none', color: 'var(--text-primary)', marginBottom: '0.75rem' }}
+                            />
+
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.2rem' }}>
+                                <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>URL del Artículo (Slug)</span>
+                                <button onClick={() => handleAIGenerateField("slug")} disabled={loadingAI} style={{ background: 'none', border: 'none', color: 'var(--accent-color)', cursor: 'pointer', fontSize: '0.8rem' }}>✨ Generar con IA</button>
+                            </div>
+                            <input
+                                id="post-slug"
+                                type="text"
+                                placeholder="slug-resumido-para-url"
+                                value={slug}
+                                onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/\s+/g, '-'))}
+                                style={{ width: '100%', fontSize: '0.9rem', padding: '0.4rem', background: 'rgba(15, 23, 42, 0.4)', border: '1px solid var(--glass-border)', borderRadius: '6px', outline: 'none', color: 'var(--text-primary)' }}
+                            />
+                        </div>
+                    </div>
+
+                    <div className={styles.editorWrapper} onContextMenu={handleContextMenu} style={{ flex: 1, overflowY: 'auto', background: '#ffffff', color: '#000000', borderRadius: '0 0 12px 12px' }}>
+                        <div className={styles.toolbar} style={{ opacity: loadingAI ? 0.5 : 1, pointerEvents: loadingAI ? 'none' : 'auto', background: '#f1f1f1', borderBottom: '1px solid #ccc' }}>
+                            <button onClick={() => editor.chain().focus().toggleBold().run()} className={`${styles.toolbarBtn} ${editor.isActive('bold') ? styles.toolbarBtnActive : ''}`} style={{ color: '#000' }}>Bold</button>
+                            <button onClick={() => editor.chain().focus().toggleItalic().run()} className={`${styles.toolbarBtn} ${editor.isActive('italic') ? styles.toolbarBtnActive : ''}`} style={{ color: '#000' }}>Italic</button>
+                            <button onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} className={`${styles.toolbarBtn} ${editor.isActive('heading', { level: 2 }) ? styles.toolbarBtnActive : ''}`} style={{ color: '#000' }}>H2</button>
+                            <button onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()} className={`${styles.toolbarBtn} ${editor.isActive('heading', { level: 3 }) ? styles.toolbarBtnActive : ''}`} style={{ color: '#000' }}>H3</button>
+                            {loadingAI && <span style={{ color: '#000', fontSize: '0.9rem', marginLeft: 'auto', alignSelf: 'center' }}>Procesando IA...</span>}
+                        </div>
+
+                        <BubbleMenu editor={editor}>
+                            <div className={styles.bubbleMenu} style={{ background: '#333' }}>
+                                <button className={styles.aiBtn} onClick={handleAIImprove} disabled={loadingAI} style={{ color: '#fff' }}>
+                                    ✨ {loadingAI ? "Reescribiendo..." : "Mejorar con IA"}
+                                </button>
+                            </div>
+                        </BubbleMenu>
+
+                        <div style={{ flex: 1, padding: '1rem' }}>
+                            <EditorContent editor={editor} className={styles.editorContent} />
+                        </div>
+
+                        {contextMenu?.show && (
+                            <div className={styles.contextMenu} style={{ top: contextMenu.y, left: contextMenu.x, background: '#333', color: '#fff', minWidth: '220px' }} onClick={(e) => e.stopPropagation()}>
+                                <div className={styles.contextMenuItem} onClick={() => { handleAIGenerateImage(contextMenu.pos); setContextMenu(null); }}>
+                                    <span style={{ fontSize: '1.2rem' }}>🖼️</span> Generar Imagen Aquí
+                                </div>
+                                <div className={styles.contextMenuItem} onClick={() => { handleAIGenerateInfographic(contextMenu.pos); setContextMenu(null); }} style={{ borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+                                    <span style={{ fontSize: '1.2rem' }}>📊</span> Generar Infografía Aquí
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
+
+            <div style={{ width: '350px', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                <div className="glass-panel" style={{ flex: 1, overflowY: 'auto' }}>
+                    <h3 style={{ marginBottom: '1.5rem', fontSize: '1.25rem' }}>Configuración de Publicación</h3>
+
+                    {/* Featured Image Section */}
+                    <div style={{ marginBottom: '1.5rem', paddingBottom: '1.5rem', borderBottom: '1px solid var(--glass-border)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                            <label style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', fontWeight: 'bold' }}>🖼️ Imagen Destacada</label>
+                        </div>
+
+                        {loadingFeaturedImg ? (
+                            <div style={{
+                                border: '2px dashed var(--accent-color)',
+                                borderRadius: '8px', padding: '2rem',
+                                textAlign: 'center', marginBottom: '0.5rem',
+                                background: 'rgba(15, 23, 42, 0.4)',
+                                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem'
+                            }}>
+                                <div style={{
+                                    width: '30px', height: '30px',
+                                    border: '3px solid rgba(255,255,255,0.1)',
+                                    borderTopColor: 'var(--accent-color)',
+                                    borderRadius: '50%',
+                                    animation: 'spin 1.5s linear infinite'
+                                }} />
+                                <p style={{ color: 'var(--accent-color)', fontSize: '0.85rem', fontWeight: 500 }}>
+                                    Generando imagen...
+                                </p>
+                            </div>
+                        ) : featuredImage ? (
+                            <div style={{ position: 'relative', marginBottom: '0.5rem' }}>
+                                <img
+                                    src={featuredImage}
+                                    alt={featuredImageAlt}
+                                    style={{ width: '100%', borderRadius: '8px', border: '1px solid var(--glass-border)' }}
+                                />
+                                <button
+                                    onClick={() => { setFeaturedImage(null); setFeaturedImageAlt(""); }}
+                                    style={{
+                                        position: 'absolute', top: '8px', right: '8px',
+                                        background: 'rgba(220, 38, 38, 0.9)', color: '#fff',
+                                        border: 'none', borderRadius: '50%', width: '28px', height: '28px',
+                                        cursor: 'pointer', fontSize: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center'
+                                    }}
+                                >✕</button>
+                            </div>
+                        ) : (
+                            <div style={{
+                                border: '2px dashed var(--glass-border)',
+                                borderRadius: '8px', padding: '1.5rem',
+                                textAlign: 'center', marginBottom: '0.5rem',
+                                background: 'rgba(15, 23, 42, 0.3)'
+                            }}>
+                                <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '0.75rem' }}>
+                                    Sin imagen destacada
+                                </p>
+                            </div>
+                        )}
+
+                        <style>{`
+                            @keyframes spin { to { transform: rotate(360deg); } }
+                        `}</style>
+
+                        <input
+                            type="text"
+                            placeholder="Alt text de la imagen destacada..."
+                            value={featuredImageAlt}
+                            onChange={(e) => setFeaturedImageAlt(e.target.value)}
+                            style={{
+                                width: '100%', padding: '0.5rem', marginBottom: '0.5rem',
+                                background: 'rgba(15, 23, 42, 0.6)', border: '1px solid var(--glass-border)',
+                                borderRadius: '6px', color: 'var(--text-primary)', fontSize: '0.85rem'
+                            }}
+                        />
+
+                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                            <button
+                                onClick={handleGenerateFeaturedImage}
+                                disabled={loadingFeaturedImg || loadingAI}
+                                className="btn-primary"
+                                style={{ flex: 1, padding: '0.5rem', fontSize: '0.85rem' }}
+                            >
+                                {loadingFeaturedImg ? "Generando..." : "✨ Generar con IA"}
+                            </button>
+                            <label style={{
+                                flex: 1, padding: '0.5rem', fontSize: '0.85rem', textAlign: 'center',
+                                background: 'rgba(100, 116, 139, 0.4)', borderRadius: '8px', cursor: 'pointer',
+                                color: 'var(--text-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center'
+                            }}>
+                                📁 Subir Imagen
+                                <input type="file" accept="image/*" onChange={handleFeaturedImageUpload} style={{ display: 'none' }} />
+                            </label>
+                        </div>
+                    </div>
+
+                    <div style={{ marginBottom: '1rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.2rem' }}>
+                            <label style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Meta Título</label>
+                            <button onClick={() => handleAIGenerateField("metaTitle")} disabled={loadingAI} style={{ background: 'none', border: 'none', color: 'var(--accent-color)', cursor: 'pointer', fontSize: '0.8rem' }}>✨ Generar</button>
+                        </div>
+                        <input
+                            type="text"
+                            value={metaTitle}
+                            onChange={(e) => setMetaTitle(e.target.value)}
+                            placeholder="Meta título SEO..."
+                            style={{ width: '100%', padding: '0.75rem', marginTop: '0.2rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid var(--glass-border)', borderRadius: '8px', color: 'var(--text-primary)' }}
+                        />
+                    </div>
+
+                    <div style={{ marginBottom: '1rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.2rem' }}>
+                            <label style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Meta Descripción</label>
+                            <button onClick={() => handleAIGenerateField("metaDesc")} disabled={loadingAI} style={{ background: 'none', border: 'none', color: 'var(--accent-color)', cursor: 'pointer', fontSize: '0.8rem' }}>✨ Generar</button>
+                        </div>
+                        <textarea
+                            rows={3}
+                            value={metaDesc}
+                            onChange={(e) => setMetaDesc(e.target.value)}
+                            placeholder="Breve resumen para SEO..."
+                            style={{ width: '100%', padding: '0.75rem', marginTop: '0.2rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid var(--glass-border)', borderRadius: '8px', color: 'var(--text-primary)' }}
+                        />
+                    </div>
+
+                    <div style={{ marginBottom: '1rem', marginTop: '1.5rem' }}>
+                        <label style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Sitio de Publicación</label>
+                        <select
+                            value={siteId}
+                            onChange={(e) => setSiteId(e.target.value)}
+                            style={{ width: '100%', padding: '0.75rem', marginTop: '0.5rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid var(--glass-border)', borderRadius: '8px', color: 'var(--text-primary)' }}
+                        >
+                            <option value="">-- Seleccionar Sitio --</option>
+                            {project.sites.map((s: any) => (
+                                <option key={s.id} value={s.id}>{s.name} ({s.url})</option>
+                            ))}
+                        </select>
+                    </div>
+
+                    <div style={{ marginBottom: '1rem' }}>
+                        <label style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Categoría</label>
+                        <select
+                            value={categoryId}
+                            onChange={(e) => setCategoryId(e.target.value)}
+                            style={{ width: '100%', padding: '0.75rem', marginTop: '0.5rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid var(--glass-border)', borderRadius: '8px', color: 'var(--text-primary)' }}
+                        >
+                            <option value="">-- Seleccionar Categoría --</option>
+                            {selectedSite && selectedSite.categories.map((c: any) => (
+                                <option key={c.id} value={c.id}>{c.name}</option>
+                            ))}
+                        </select>
+                    </div>
+
+                </div>
+
+                <button
+                    onClick={handlePublish}
+                    disabled={isPublishing || !siteId || !categoryId}
+                    className="btn-primary"
+                    style={{ padding: '1rem', fontSize: '1.1rem', background: isPublishing ? 'gray' : 'var(--success-color)' }}
+                >
+                    {isPublishing ? "Publicando en WP..." : "Publicar en WordPress"}
+                </button>
+            </div>
+        </>
+    );
+}

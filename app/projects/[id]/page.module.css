@@ -1,0 +1,71 @@
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2rem 0;
+}
+
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+}
+
+.grid {
+    display: grid;
+    grid-template-columns: 300px 1fr;
+    gap: 2rem;
+    margin-top: 2rem;
+}
+
+.sidebar {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.mainContent {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.siteCard {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    padding: 1rem;
+    background: rgba(30, 41, 59, 0.4);
+    border-radius: 8px;
+}
+
+.inputField {
+    width: 100%;
+    padding: 0.75rem;
+    margin-top: 0.5rem;
+    background: rgba(15, 23, 42, 0.6);
+    border: 1px solid var(--glass-border);
+    border-radius: 8px;
+    color: var(--text-primary);
+    font-family: inherit;
+}
+
+.inputField:focus {
+    outline: 2px solid var(--accent-color);
+}
+
+.formGroup {
+    margin-bottom: 1rem;
+}
+
+.label {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+}
+
+.emptyState {
+    text-align: center;
+    padding: 3rem;
+    color: var(--text-secondary);
+}

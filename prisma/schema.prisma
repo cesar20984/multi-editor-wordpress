@@ -1,0 +1,79 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Project {
+  id        String          @id @default(cuid())
+  name      String
+  language  String?
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+  sites     WordPressSite[]
+  posts     Post[]
+}
+
+model WordPressSite {
+  id         String     @id @default(cuid())
+  name       String
+  url        String
+  username   String
+  password   String
+  projectId  String
+  project    Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  categories Category[]
+  posts      Post[]
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+}
+
+model Category {
+  id     String        @id @default(cuid())
+  wpId   Int
+  name   String
+  siteId String
+  site   WordPressSite @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  posts  Post[]
+
+  @@unique([wpId, siteId])
+}
+
+model Post {
+  id          String         @id @default(cuid())
+  title       String?
+  slug        String?
+  metaTitle   String?
+  metaDesc    String?
+  content     String?
+  featuredImg String?
+  wpPostId    Int?
+  status      String         @default("draft")
+  projectId   String
+  project     Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  siteId      String?
+  site        WordPressSite? @relation(fields: [siteId], references: [id], onDelete: SetNull)
+  categoryId  String?
+  category    Category?      @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+}
+
+model Setting {
+  id                    String   @id @default(cuid())
+  defaultArticlePrompt  String   @default("Actúa como un experto en SEO y redactor para WordPress. Escribe un artículo extenso, altamente detallado y fácil de leer. Usa una estructura jerárquica con encabezados H2 y H3. Empieza con un gancho atractivo y finaliza con una conclusión potente. Mantén una longitud superior a 800 palabras. No uses H1. Usa formato HTML válido (p, strong, ul, li).")
+  defaultTitlePrompt    String   @default("Genera un único Título SEO ganador (H1), directo y persuasivo. Máximo 60 caracteres. Sin comillas.")
+  defaultMetaTitlePrompt String  @default("Genera exactamente un Meta Título SEO. Destaca el valor principal para el lector, máximo 60 caracteres. Sin comillas.")
+  defaultMetaDescPrompt String   @default("Crea una meta descripción atrapante que genere curiosidad, invite al clic y explique qué aprenderá el usuario. Máximo 155 caracteres. Sin comillas.")
+  defaultImagePrompt    String   @default("Generate a visually stunning hero illustration for a blog post. The style should be professional, cinematic lighting, vibrant colors. DO NOT INCLUDE ANY TEXT, NUMBERS, OR LETTERS. Pure visual art only.")
+  defaultInternalImagePrompt String @default("Create a professional illustration that fits perfectly within the following article context. The image should visually represent the transition between the text before: '{BEFORE}' and the text after: '{AFTER}'. Focus on being relevant, visually descriptive, and MAINTAIN NO TEXT in the image. Pure visual representation only.")
+  defaultInfographicPrompt String @default("Create a professional, modern infographic illustration. It must be highly structured with educational sections and icons. IMPORTANT: Include clearly readable text labels, descriptive titles, and informative data points in the specified language. Use a clean, informative layout with consistent colors.")
+  textModel             String   @default("gpt-4o-mini")
+  imageModel            String   @default("dall-e-3")
+  imageSize             String   @default("1K")
+  imageAspectRatio      String   @default("1:1")
+  language              String   @default("Español")
+}
