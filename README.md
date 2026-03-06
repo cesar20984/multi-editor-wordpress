@@ -18,7 +18,7 @@ bun dev
 
 Este proyecto es un editor avanzado para WordPress que utiliza IA para generar contenido e imágenes.
 
-**Actualización:** El proyecto ha sido migrado a **Neon PostgreSQL** para soportar despliegues en la nube (Vercel).
+**Actualización:** El proyecto ha sido migrado a **Neon PostgreSQL** (Proyecto: multi-editor-wordpress) para soportar despliegues en la nube (Vercel).
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
