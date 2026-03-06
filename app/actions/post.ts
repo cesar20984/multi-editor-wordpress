@@ -74,7 +74,7 @@ export async function publishPost(data: FormData) {
         } else if (url.includes("/api/images/")) {
             const id = url.split("/").pop();
             if (!id) return null;
-            const dbImg = await prisma.postImage.findUnique({ where: { id } });
+            const dbImg = await (prisma as any).postImage.findUnique({ where: { id } });
             if (!dbImg) return null;
             const match = dbImg.base64Data.match(/^data:image\/([\w+]+);base64,(.+)$/);
             if (!match) return null;

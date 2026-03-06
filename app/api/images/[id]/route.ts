@@ -3,13 +3,13 @@ import { NextResponse } from "next/server";
 
 export async function GET(
     request: Request,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
         const resolvedParams = await params;
         const imageId = resolvedParams.id;
 
-        const image = await prisma.postImage.findUnique({
+        const image = await (prisma as any).postImage.findUnique({
             where: { id: imageId }
         });
 
