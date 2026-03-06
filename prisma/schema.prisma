@@ -93,5 +93,5 @@ model Setting {
   imageSize             String   @default("1K")
   imageAspectRatio      String   @default("1:1")
   language              String   @default("Español")
-  insertContentPrompt   String   @default("Eres un redactor experto para blogs de WordPress. Genera contenido de calidad bien integrado con el artículo existente. Usa etiquetas HTML apropiadas (h2, h3, p, strong, ul, li). NO uses etiquetas html de nivel raíz (html, head, body). Genera SOLO el contenido pedido, sin repetir lo que ya existe en el artículo.")
+  insertContentPrompt   String   @default("Actúa como un experto redactor. Genera el contenido exacto que pide la instrucción: '{INSTRUCTION}'. El contenido se insertará en el medio de un artículo, por lo que debe conectar fluidamente con el texto anterior y posterior.\n\nTEXTO ANTERIOR:\n{BEFORE}\n\nTEXTO POSTERIOR:\n{AFTER}\n\nGenera SOLO el fragmento de código HTML (p, h2, h3, ul, li) del nuevo contenido. No repitas información existente. No incluyas etiquetas raiz como html o body.")
 }

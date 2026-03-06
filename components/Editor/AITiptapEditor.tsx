@@ -564,12 +564,16 @@ export function AITiptapEditor({ project, settings, existingPost }: { project: a
         const textAfter = editor.state.doc.textBetween(pos, Math.min(editor.state.doc.content.size, pos + 400), ' ');
         try {
             const basePrompt = settings?.insertContentPrompt ||
-                "Eres un redactor experto para blogs de WordPress. Genera contenido de calidad bien integrado con el artículo existente. Usa etiquetas HTML apropiadas (h2, h3, p, strong, ul, li). NO uses etiquetas html de nivel raíz (html, head, body). Genera SOLO el contenido pedido, sin repetir lo que ya existe en el artículo.";
-            const sys = `${basePrompt}
-Escribe en ${lang}.
-El artículo tiene este contexto antes del cursor: "${textBefore.slice(-300)}"
-Y este contenido después: "${textAfter.slice(0, 300)}"`;
-            const result = await generateAIText(`Instrucción: ${instruction}`, "custom", sys);
+                "Actúa como un experto redactor. Genera el contenido exacto que pide la instrucción: '{INSTRUCTION}'. El contenido se insertará en el medio de un artículo, por lo que debe conectar fluidamente con el texto anterior y posterior.\n\nTEXTO ANTERIOR:\n{BEFORE}\n\nTEXTO POSTERIOR:\n{AFTER}\n\nGenera SOLO el fragmento de código HTML (p, h2, h3, ul, li) del nuevo contenido. No repitas información existente. No incluyas etiquetas raiz como html o body.";
+
+            let sys = basePrompt
+                .replace(/{INSTRUCTION}/g, instruction)
+                .replace(/{BEFORE}/g, textBefore.slice(-500))
+                .replace(/{AFTER}/g, textAfter.slice(0, 500));
+
+            sys += `\n\nPor favor escribe en idioma: ${lang}.`;
+
+            const result = await generateAIText(`Por favor completa la instrucción: ${instruction}`, "custom", sys);
             editor.chain().focus().insertContentAt(pos, result).run();
             showToast("✅ Contenido insertado", "success");
         } catch (error) {
