@@ -60,6 +60,22 @@ model Post {
   category    Category?      @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
+  images      PostImage[]
+}
+
+model PostImage {
+  id              String         @id @default(cuid())
+  base64Data      String         // Storing the image data here instead of in the post content
+  altText         String?
+  isFeatured      Boolean        @default(false)
+  
+  postId          String
+  post            Post           @relation(fields: [postId], references: [id], onDelete: Cascade)
+  
+  wordPressSiteId String?
+  wordPressSite   WordPressSite? @relation(fields: [wordPressSiteId], references: [id], onDelete: SetNull)
+  
+  createdAt       DateTime       @default(now())
 }
 
 model Setting {

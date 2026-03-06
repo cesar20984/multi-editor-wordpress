@@ -62,47 +62,68 @@ export async function publishPost(data: FormData) {
         return { id: mediaJson.id, url: mediaJson.source_url };
     }
 
+    // Helper: extract buffer from data URL or DB proxy URL
+    async function getImageData(url: string) {
+        if (url.startsWith("data:image/")) {
+            const match = url.match(/^data:image\/([\w+]+);base64,(.+)$/);
+            if (!match) return null;
+            return {
+                type: match[1],
+                buffer: Buffer.from(match[2], 'base64')
+            };
+        } else if (url.includes("/api/images/")) {
+            const id = url.split("/").pop();
+            if (!id) return null;
+            const dbImg = await prisma.postImage.findUnique({ where: { id } });
+            if (!dbImg) return null;
+            const match = dbImg.base64Data.match(/^data:image\/([\w+]+);base64,(.+)$/);
+            if (!match) return null;
+            return {
+                type: match[1],
+                buffer: Buffer.from(match[2], 'base64')
+            };
+        }
+        return null;
+    }
+
     // 1. Upload featured image if provided
     let featuredMediaId: number | null = null;
-    if (featuredImageBase64 && featuredImageBase64.startsWith("data:image/")) {
+    if (featuredImageBase64) {
         try {
-            const base64Match = featuredImageBase64.match(/^data:image\/([\w+]+);base64,(.+)$/);
-            if (base64Match) {
-                const imageType = base64Match[1];
-                const rawBase64 = base64Match[2];
-                const imgBuffer = Buffer.from(rawBase64, 'base64');
-                const filename = `featured-${Date.now()}.${imageType}`;
-
-                const result = await uploadImageToWP(imgBuffer, filename, `image/${imageType}`, featuredImageAlt);
-                if (result) {
-                    featuredMediaId = result.id;
-                }
+            const imgData = await getImageData(featuredImageBase64);
+            if (imgData) {
+                const filename = `featured-${Date.now()}.${imgData.type}`;
+                const result = await uploadImageToWP(imgData.buffer, filename, `image/${imgData.type}`, featuredImageAlt);
+                if (result) featuredMediaId = result.id;
             }
         } catch (e) {
             console.error("Error subiendo imagen destacada:", e);
         }
     }
 
-    // 2. Extract base64 images from HTML content, upload to WP and replace with public URLs
-    const imgRegex = /<img[^>]+src="data:image\/(webp|jpeg|png);base64,([^"]+)"[^>]*alt="([^"]*)"[^>]*>/gi;
+    // 2. Extract and upload internal images (Base64 or Proxy URLs)
+    // Matches both data:image/ and /api/images/ patterns
+    const imgRegex = /<img[^>]+src="([^"]+)"[^>]*alt="([^"]*)"[^>]*>/gi;
     const matches = [...content.matchAll(imgRegex)];
 
     for (const match of matches) {
         const fullMatch = match[0];
-        const imageType = match[1];
-        const base64Data = match[2];
-        const altText = match[3] || "imagen generada ai";
+        const imgSrc = match[1];
+        const altText = match[2] || "imagen generada ai";
 
-        const imgBuffer = Buffer.from(base64Data, 'base64');
-        const filename = `ai-image-${Date.now()}.${imageType}`;
-
-        try {
-            const result = await uploadImageToWP(imgBuffer, filename, `image/${imageType}`, altText);
-            if (result) {
-                content = content.replace(fullMatch, `<img src="${result.url}" alt="${altText}" class="aligncenter" />`);
+        if (imgSrc.startsWith("data:image/") || imgSrc.includes("/api/images/")) {
+            try {
+                const imgData = await getImageData(imgSrc);
+                if (imgData) {
+                    const filename = `ai-image-${Date.now()}.${imgData.type}`;
+                    const result = await uploadImageToWP(imgData.buffer, filename, `image/${imgData.type}`, altText);
+                    if (result) {
+                        content = content.replace(fullMatch, `<img src="${result.url}" alt="${altText}" class="aligncenter" />`);
+                    }
+                }
+            } catch (e) {
+                console.error("Error subiendo imagen interna a WP:", e);
             }
-        } catch (e) {
-            console.error("Error subiendo imagen a WP:", e);
         }
     }
 

@@ -9,7 +9,7 @@ const openai = new OpenAI({
 
 export async function POST(request: Request) {
     try {
-        const { contextBefore, contextAfter, wordPressSiteId, model, isFeatured, isInfographic, imageSize, imageAspectRatio, language } = await request.json();
+        const { contextBefore, contextAfter, wordPressSiteId, model, isFeatured, isInfographic, imageSize, imageAspectRatio, language, postId } = await request.json();
         const settings = await (prisma as any).setting.findFirst();
 
         const lang = language || settings?.language || "Español";
@@ -183,11 +183,33 @@ export async function POST(request: Request) {
             altText = altResponse.choices[0].message.content?.replace(/["']/g, '') || altText;
         } catch (e) { /* keep default alt */ }
 
-        // 4. Convert to Data URL (Base64) for Vercel compatibility
         const base64Image = `data:image/webp;base64,${webpBuffer.toString("base64")}`;
 
+        // 5. Save to Database for stable persistent URL
+        let finalImageUrl = base64Image;
+
+        if (postId) {
+            try {
+                // Using (prisma as any) to avoid temporary lint if generate hasn't finished
+                const savedImage = await (prisma as any).postImage.create({
+                    data: {
+                        base64Data: base64Image,
+                        altText,
+                        isFeatured: isFeatured === true,
+                        postId,
+                        wordPressSiteId: wordPressSiteId || null
+                    }
+                });
+                // Return a proxy URL instead of massive base64
+                finalImageUrl = `/api/images/${savedImage.id}`;
+            } catch (dbErr) {
+                console.error("Error saving image to DB:", dbErr);
+                // Fallback to base64 if DB fails
+            }
+        }
+
         return NextResponse.json({
-            imageUrl: base64Image,
+            imageUrl: finalImageUrl,
             altText
         });
 

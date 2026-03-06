@@ -274,6 +274,13 @@ export function AITiptapEditor({ project, settings, existingPost }: { project: a
             // Step 5: Generate Featured Image in background
             setLoadingFeaturedImg(true);
             try {
+                // Ensure we have a postId before generating image
+                let currentPostId = postIdRef.current;
+                if (!currentPostId) {
+                    const savedPost = await saveDraft();
+                    currentPostId = savedPost?.id || null;
+                }
+
                 const imgRes = await fetch("/api/ai/generate-image", {
                     method: "POST",
                     body: JSON.stringify({
@@ -284,7 +291,8 @@ export function AITiptapEditor({ project, settings, existingPost }: { project: a
                         isFeatured: true,
                         imageSize: settings?.imageSize || "1K",
                         imageAspectRatio: settings?.imageAspectRatio || "1:1",
-                        language: lang
+                        language: lang,
+                        postId: currentPostId
                     }),
                     headers: { "Content-Type": "application/json" }
                 });
@@ -295,7 +303,7 @@ export function AITiptapEditor({ project, settings, existingPost }: { project: a
 
                     // Force a save after setting the featured image
                     stateRef.current.featuredImage = imgData.imageUrl;
-                    saveDraft();
+                    await saveDraft();
                     showToast("🖼️ ¡Imagen destacada generada!", "success");
                 }
             } catch (imgErr) {
@@ -303,7 +311,7 @@ export function AITiptapEditor({ project, settings, existingPost }: { project: a
                 showToast("Error generando imagen destacada", "error");
             }
             setLoadingFeaturedImg(false);
-            return; // already set loadingAI false above
+            return;
         } catch (error) {
             console.error(error);
             setAiStep(null);
@@ -360,6 +368,13 @@ export function AITiptapEditor({ project, settings, existingPost }: { project: a
         const textAfter = editor.state.doc.textBetween(pos, Math.min(editor.state.doc.content.size, pos + 500), ' ');
 
         try {
+            // Ensure we have a postId before generating image
+            let currentPostId = postIdRef.current;
+            if (!currentPostId) {
+                const savedPost = await saveDraft();
+                currentPostId = savedPost?.id || null;
+            }
+
             const res = await fetch("/api/ai/generate-image", {
                 method: "POST",
                 body: JSON.stringify({
@@ -369,7 +384,8 @@ export function AITiptapEditor({ project, settings, existingPost }: { project: a
                     model: settings?.imageModel || "dall-e-3",
                     imageSize: settings?.imageSize || "1K",
                     imageAspectRatio: settings?.imageAspectRatio || "1:1",
-                    language: project.language || settings?.language || "Español"
+                    language: project.language || settings?.language || "Español",
+                    postId: currentPostId
                 }),
                 headers: { "Content-Type": "application/json" }
             });
@@ -399,6 +415,13 @@ export function AITiptapEditor({ project, settings, existingPost }: { project: a
         const textAfter = editor.state.doc.textBetween(pos, Math.min(editor.state.doc.content.size, pos + 500), ' ');
 
         try {
+            // Ensure we have a postId before generating image
+            let currentPostId = postIdRef.current;
+            if (!currentPostId) {
+                const savedPost = await saveDraft();
+                currentPostId = savedPost?.id || null;
+            }
+
             const res = await fetch("/api/ai/generate-image", {
                 method: "POST",
                 body: JSON.stringify({
@@ -409,7 +432,8 @@ export function AITiptapEditor({ project, settings, existingPost }: { project: a
                     imageSize: settings?.imageSize || "1K",
                     imageAspectRatio: settings?.imageAspectRatio || "1:1",
                     language: project.language || settings?.language || "Español",
-                    isInfographic: true
+                    isInfographic: true,
+                    postId: currentPostId
                 }),
                 headers: { "Content-Type": "application/json" }
             });
@@ -438,6 +462,13 @@ export function AITiptapEditor({ project, settings, existingPost }: { project: a
         }
         setLoadingFeaturedImg(true);
         try {
+            // Ensure we have a postId before generating image
+            let currentPostId = postIdRef.current;
+            if (!currentPostId) {
+                const savedPost = await saveDraft();
+                currentPostId = savedPost?.id || null;
+            }
+
             const context = title || editor.getText().slice(0, 500);
             const res = await fetch("/api/ai/generate-image", {
                 method: "POST",
@@ -449,7 +480,8 @@ export function AITiptapEditor({ project, settings, existingPost }: { project: a
                     isFeatured: true,
                     imageSize: settings?.imageSize || "1K",
                     imageAspectRatio: settings?.imageAspectRatio || "1:1",
-                    language: project.language || settings?.language || "Español"
+                    language: project.language || settings?.language || "Español",
+                    postId: currentPostId
                 }),
                 headers: { "Content-Type": "application/json" }
             });
@@ -460,7 +492,7 @@ export function AITiptapEditor({ project, settings, existingPost }: { project: a
 
                 // Force a save after setting the featured image
                 stateRef.current.featuredImage = data.imageUrl;
-                saveDraft();
+                await saveDraft();
             } else {
                 showToast(data.error || "Error al generar imagen destacada", "error");
             }
