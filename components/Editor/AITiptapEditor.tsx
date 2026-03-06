@@ -33,6 +33,9 @@ export function AITiptapEditor({ project, settings, existingPost }: { project: a
     const [customInstruction, setCustomInstruction] = useState("");
     const [showCustomInput, setShowCustomInput] = useState(false);
     const customInputRef = useRef<HTMLInputElement>(null);
+    const [insertInstruction, setInsertInstruction] = useState("");
+    const [showInsertInput, setShowInsertInput] = useState(false);
+    const insertInputRef = useRef<HTMLInputElement>(null);
 
     // Toast notification system
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
@@ -547,6 +550,28 @@ export function AITiptapEditor({ project, settings, existingPost }: { project: a
         setLoadingAI(false);
     };
 
+    const handleAIInsertContent = async (pos: number, instruction: string) => {
+        setLoadingAI(true);
+        const lang = project.language || settings?.language || "Español";
+        const textBefore = editor.state.doc.textBetween(Math.max(0, pos - 600), pos, ' ');
+        const textAfter = editor.state.doc.textBetween(pos, Math.min(editor.state.doc.content.size, pos + 400), ' ');
+        try {
+            const sys = `Eres un redactor experto para blogs de WordPress. Escribe en ${lang}. 
+El usuario quiere insertar contenido en un artículo. Genera el contenido solicitado usando etiquetas HTML apropiadas (h2, h3, p, strong, ul, li). 
+NO uses etiquetas html de nivel raíz (html, head, body). Solo el contenido a insertar.
+El artículo tiene este contexto antes del cursor: "${textBefore.slice(-300)}"
+Y este contenido después: "${textAfter.slice(0, 300)}"
+Genera SOLO el contenido pedido, bien integrado con el contexto, sin repetir lo que ya existe.`;
+            const result = await generateAIText(`Instrucción: ${instruction}`, "custom", sys);
+            editor.chain().focus().insertContentAt(pos, result).run();
+            showToast("✅ Contenido insertado", "success");
+        } catch (error) {
+            console.error(error);
+            showToast("Error al generar el contenido", "error");
+        }
+        setLoadingAI(false);
+    };
+
     // Featured Image Generation
     const handleGenerateFeaturedImage = async () => {
         if (!editor.getText().trim() && !title.trim()) {
@@ -865,13 +890,148 @@ export function AITiptapEditor({ project, settings, existingPost }: { project: a
                         </div>
 
                         {contextMenu?.show && (
-                            <div className={styles.contextMenu} style={{ top: contextMenu.y, left: contextMenu.x, background: '#333', color: '#fff', minWidth: '220px' }} onClick={(e) => e.stopPropagation()}>
-                                <div className={styles.contextMenuItem} onClick={() => { handleAIGenerateImage(contextMenu.pos); setContextMenu(null); }}>
-                                    <span style={{ fontSize: '1.2rem' }}>🖼️</span> Generar Imagen Aquí
+                            <div
+                                onClick={(e) => e.stopPropagation()}
+                                style={{
+                                    position: 'fixed',
+                                    top: contextMenu.y,
+                                    left: contextMenu.x,
+                                    zIndex: 1000,
+                                    background: '#1e293b',
+                                    border: '1px solid rgba(255,255,255,0.12)',
+                                    borderRadius: '12px',
+                                    boxShadow: '0 16px 48px rgba(0,0,0,0.7)',
+                                    padding: '0.5rem',
+                                    minWidth: '240px',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: '0.25rem',
+                                }}
+                            >
+                                {/* Header label */}
+                                <div style={{ padding: '0.4rem 0.6rem 0.25rem', fontSize: '0.72rem', color: 'rgba(255,255,255,0.4)', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                                    Insertar con IA
                                 </div>
-                                <div className={styles.contextMenuItem} onClick={() => { handleAIGenerateInfographic(contextMenu.pos); setContextMenu(null); }} style={{ borderTop: '1px solid rgba(255,255,255,0.1)' }}>
-                                    <span style={{ fontSize: '1.2rem' }}>📊</span> Generar Infografía Aquí
-                                </div>
+
+                                {/* Image button */}
+                                <button
+                                    onClick={() => { handleAIGenerateImage(contextMenu.pos); setContextMenu(null); setShowInsertInput(false); }}
+                                    style={{
+                                        display: 'flex', alignItems: 'center', gap: '0.6rem',
+                                        padding: '0.6rem 0.75rem', borderRadius: '8px', border: 'none',
+                                        background: 'linear-gradient(135deg, rgba(16,185,129,0.2), rgba(5,150,105,0.2))',
+                                        color: '#34d399', cursor: 'pointer', fontSize: '0.88rem', fontWeight: 600,
+                                        textAlign: 'left', transition: 'background 0.2s',
+                                        width: '100%',
+                                    }}
+                                    onMouseEnter={e => (e.currentTarget.style.background = 'linear-gradient(135deg, rgba(16,185,129,0.35), rgba(5,150,105,0.35))')}
+                                    onMouseLeave={e => (e.currentTarget.style.background = 'linear-gradient(135deg, rgba(16,185,129,0.2), rgba(5,150,105,0.2))')}
+                                >
+                                    <span style={{ fontSize: '1.1rem' }}>🖼️</span>
+                                    <div>
+                                        <div>Generar Imagen</div>
+                                        <div style={{ fontSize: '0.75rem', opacity: 0.7, fontWeight: 400 }}>IA crea una imagen contextual</div>
+                                    </div>
+                                </button>
+
+                                {/* Infographic button */}
+                                <button
+                                    onClick={() => { handleAIGenerateInfographic(contextMenu.pos); setContextMenu(null); setShowInsertInput(false); }}
+                                    style={{
+                                        display: 'flex', alignItems: 'center', gap: '0.6rem',
+                                        padding: '0.6rem 0.75rem', borderRadius: '8px', border: 'none',
+                                        background: 'linear-gradient(135deg, rgba(59,130,246,0.2), rgba(37,99,235,0.2))',
+                                        color: '#60a5fa', cursor: 'pointer', fontSize: '0.88rem', fontWeight: 600,
+                                        textAlign: 'left', transition: 'background 0.2s',
+                                        width: '100%',
+                                    }}
+                                    onMouseEnter={e => (e.currentTarget.style.background = 'linear-gradient(135deg, rgba(59,130,246,0.35), rgba(37,99,235,0.35))')}
+                                    onMouseLeave={e => (e.currentTarget.style.background = 'linear-gradient(135deg, rgba(59,130,246,0.2), rgba(37,99,235,0.2))')}
+                                >
+                                    <span style={{ fontSize: '1.1rem' }}>📊</span>
+                                    <div>
+                                        <div>Generar Infografía</div>
+                                        <div style={{ fontSize: '0.75rem', opacity: 0.7, fontWeight: 400 }}>IA crea una infografía visual</div>
+                                    </div>
+                                </button>
+
+                                {/* Separator */}
+                                <div style={{ height: '1px', background: 'rgba(255,255,255,0.08)', margin: '0.25rem 0' }} />
+
+                                {/* Insert content button */}
+                                <button
+                                    onClick={() => { setShowInsertInput(v => !v); setTimeout(() => insertInputRef.current?.focus(), 50); }}
+                                    style={{
+                                        display: 'flex', alignItems: 'center', gap: '0.6rem',
+                                        padding: '0.6rem 0.75rem', borderRadius: '8px', border: 'none',
+                                        background: showInsertInput
+                                            ? 'linear-gradient(135deg, rgba(139,92,246,0.35), rgba(124,58,237,0.35))'
+                                            : 'linear-gradient(135deg, rgba(139,92,246,0.2), rgba(124,58,237,0.2))',
+                                        color: '#c4b5fd', cursor: 'pointer', fontSize: '0.88rem', fontWeight: 600,
+                                        textAlign: 'left', transition: 'background 0.2s',
+                                        width: '100%',
+                                    }}
+                                    onMouseEnter={e => (e.currentTarget.style.background = 'linear-gradient(135deg, rgba(139,92,246,0.35), rgba(124,58,237,0.35))')}
+                                    onMouseLeave={e => { if (!showInsertInput) e.currentTarget.style.background = 'linear-gradient(135deg, rgba(139,92,246,0.2), rgba(124,58,237,0.2))'; }}
+                                >
+                                    <span style={{ fontSize: '1.1rem' }}>✍️</span>
+                                    <div>
+                                        <div>Insertar Contenido</div>
+                                        <div style={{ fontSize: '0.75rem', opacity: 0.7, fontWeight: 400 }}>IA agrega texto, secciones o párrafos</div>
+                                    </div>
+                                </button>
+
+                                {/* Insert content input */}
+                                {showInsertInput && (
+                                    <div style={{ padding: '0.25rem 0.1rem 0.1rem', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                                        <input
+                                            ref={insertInputRef}
+                                            type="text"
+                                            value={insertInstruction}
+                                            onChange={e => setInsertInstruction(e.target.value)}
+                                            onKeyDown={async e => {
+                                                if (e.key === 'Enter' && insertInstruction.trim()) {
+                                                    const pos = contextMenu.pos;
+                                                    const instr = insertInstruction;
+                                                    setContextMenu(null);
+                                                    setInsertInstruction("");
+                                                    setShowInsertInput(false);
+                                                    await handleAIInsertContent(pos, instr);
+                                                }
+                                                if (e.key === 'Escape') setShowInsertInput(false);
+                                            }}
+                                            placeholder="Ej: agrega una sección sobre los beneficios..."
+                                            style={{
+                                                width: '100%', padding: '0.45rem 0.65rem',
+                                                background: 'rgba(255,255,255,0.07)',
+                                                border: '1px solid rgba(139,92,246,0.4)',
+                                                borderRadius: '8px', color: '#fff',
+                                                fontSize: '0.82rem', outline: 'none',
+                                                boxSizing: 'border-box',
+                                            }}
+                                        />
+                                        <button
+                                            disabled={!insertInstruction.trim() || loadingAI}
+                                            onClick={async () => {
+                                                const pos = contextMenu.pos;
+                                                const instr = insertInstruction;
+                                                setContextMenu(null);
+                                                setInsertInstruction("");
+                                                setShowInsertInput(false);
+                                                await handleAIInsertContent(pos, instr);
+                                            }}
+                                            style={{
+                                                background: 'linear-gradient(135deg, #8b5cf6, #7c3aed)',
+                                                border: 'none', borderRadius: '8px', color: '#fff',
+                                                padding: '0.45rem', cursor: insertInstruction.trim() ? 'pointer' : 'not-allowed',
+                                                fontSize: '0.85rem', fontWeight: 700, opacity: insertInstruction.trim() ? 1 : 0.5,
+                                                width: '100%',
+                                            }}
+                                        >
+                                            ⚡ Generar e Insertar
+                                        </button>
+                                    </div>
+                                )}
                             </div>
                         )}
                     </div>
