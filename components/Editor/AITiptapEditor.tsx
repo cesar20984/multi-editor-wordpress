@@ -404,13 +404,52 @@ export function AITiptapEditor({ project, settings, existingPost }: { project: a
 
         setLoadingAI(true);
         try {
-            // Only send the selected text, no article context
             const result = await generateAIText(selectedText, "rewrite");
             editor.chain().focus().insertContentAt({ from, to }, result).run();
         } catch (error) {
             console.error(error);
             alert("Error al mejorar texto");
         }
+        setLoadingAI(false);
+    };
+
+    const handleAISpellCheck = async () => {
+        const { from, to } = editor.state.selection;
+        const selectedText = editor.state.doc.textBetween(from, to, ' ');
+        if (!selectedText) return;
+
+        setLoadingAI(true);
+        try {
+            const sys = `Eres un corrector ortográfico. Tu única tarea es corregir los errores ortográficos y gramaticales del texto que recibas. NO cambies el estilo, NO reorganices frases, NO cambies palabras por sinónimos, NO modifiques la estructura ni los encabezados. Devuelve EXACTAMENTE el mismo texto con solo los errores ortográficos corregidos. Responde únicamente con el texto corregido, sin explicaciones.`;
+            const result = await generateAIText(selectedText, "custom", sys);
+            editor.chain().focus().insertContentAt({ from, to }, result).run();
+        } catch (error) {
+            console.error(error);
+            showToast("Error al corregir ortografía", "error");
+        }
+        setLoadingAI(false);
+    };
+
+    const [customInstruction, setCustomInstruction] = useState("");
+    const [showCustomInput, setShowCustomInput] = useState(false);
+    const customInputRef = useRef<HTMLInputElement>(null);
+
+    const handleAICustomInstruction = async () => {
+        const { from, to } = editor.state.selection;
+        const selectedText = editor.state.doc.textBetween(from, to, ' ');
+        if (!selectedText || !customInstruction.trim()) return;
+
+        setLoadingAI(true);
+        setShowCustomInput(false);
+        try {
+            const sys = `Aplicar la siguiente instrucción al texto del usuario: "${customInstruction}". Responde SOLO con el texto resultante, sin explicaciones, sin introducciones.`;
+            const result = await generateAIText(selectedText, "custom", sys);
+            editor.chain().focus().insertContentAt({ from, to }, result).run();
+        } catch (error) {
+            console.error(error);
+            showToast("Error al aplicar la instrucción", "error");
+        }
+        setCustomInstruction("");
         setLoadingAI(false);
     };
 
@@ -776,10 +815,49 @@ export function AITiptapEditor({ project, settings, existingPost }: { project: a
                         </div>
 
                         <BubbleMenu editor={editor}>
-                            <div className={styles.bubbleMenu} style={{ background: '#333' }}>
-                                <button className={styles.aiBtn} onClick={handleAIImprove} disabled={loadingAI} style={{ color: '#fff' }}>
-                                    ✨ {loadingAI ? "Reescribiendo..." : "Mejorar con IA"}
-                                </button>
+                            <div className={styles.bubbleMenu} style={{ background: '#1e293b', border: '1px solid rgba(255,255,255,0.1)', flexDirection: 'column', gap: 0, padding: '0.25rem' }}>
+                                <div style={{ display: 'flex', gap: '0.25rem' }}>
+                                    <button className={styles.aiBtn} onClick={handleAIImprove} disabled={loadingAI} title="Reescribe el texto seleccionado con mejor redacción">
+                                        ✨ {loadingAI ? "Procesando..." : "Mejorar"}
+                                    </button>
+                                    <button className={styles.aiBtn} onClick={handleAISpellCheck} disabled={loadingAI}
+                                        style={{ background: 'linear-gradient(135deg, #3b82f6, #2563eb)', boxShadow: '0 2px 10px rgba(59,130,246,0.3)' }}
+                                        title="Solo corrige errores ortográficos, sin cambiar el texto">
+                                        🔤 Ortografía
+                                    </button>
+                                    <button className={styles.aiBtn} onClick={() => { setShowCustomInput(v => !v); setTimeout(() => customInputRef.current?.focus(), 50); }} disabled={loadingAI}
+                                        style={{ background: 'linear-gradient(135deg, #8b5cf6, #7c3aed)', boxShadow: '0 2px 10px rgba(139,92,246,0.3)' }}
+                                        title="Escribe tu propia instrucción para aplicar al texto">
+                                        ⚡ Personalizado
+                                    </button>
+                                </div>
+                                {showCustomInput && (
+                                    <div style={{ display: 'flex', gap: '0.25rem', marginTop: '0.25rem' }}>
+                                        <input
+                                            ref={customInputRef}
+                                            type="text"
+                                            value={customInstruction}
+                                            onChange={e => setCustomInstruction(e.target.value)}
+                                            onKeyDown={e => { if (e.key === 'Enter') handleAICustomInstruction(); if (e.key === 'Escape') setShowCustomInput(false); }}
+                                            placeholder="Ej: hazlo más formal, resume en 2 frases..."
+                                            style={{
+                                                flex: 1, padding: '0.3rem 0.6rem',
+                                                background: 'rgba(255,255,255,0.1)',
+                                                border: '1px solid rgba(255,255,255,0.2)',
+                                                borderRadius: '6px', color: '#fff',
+                                                fontSize: '0.82rem', outline: 'none'
+                                            }}
+                                        />
+                                        <button onClick={handleAICustomInstruction} disabled={!customInstruction.trim() || loadingAI}
+                                            style={{
+                                                background: 'linear-gradient(135deg, #8b5cf6, #7c3aed)',
+                                                border: 'none', borderRadius: '6px', color: '#fff',
+                                                padding: '0.3rem 0.6rem', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 600
+                                            }}>
+                                            Aplicar
+                                        </button>
+                                    </div>
+                                )}
                             </div>
                         </BubbleMenu>
 
