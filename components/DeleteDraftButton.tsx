@@ -44,27 +44,21 @@ export function DeleteDraftButton({ postId, postTitle }: DeleteDraftButtonProps)
             disabled={deleting}
             title="Eliminar borrador"
             style={{
-                background: 'rgba(239, 68, 68, 0.15)',
-                border: '1px solid rgba(239, 68, 68, 0.3)',
-                color: '#f87171',
-                padding: '0.2rem 0.6rem',
-                borderRadius: '6px',
+                background: 'none',
+                border: 'none',
+                color: deleting ? 'var(--text-secondary)' : '#f87171',
+                padding: 0,
                 cursor: deleting ? 'not-allowed' : 'pointer',
-                fontSize: '0.8rem',
-                fontWeight: 600,
-                opacity: deleting ? 0.6 : 1,
-                transition: 'all 0.2s ease',
+                fontSize: '0.9rem',
+                fontWeight: 400,
+                textDecoration: 'none',
+                transition: 'opacity 0.2s ease',
+                opacity: deleting ? 0.5 : 1,
             }}
-            onMouseEnter={e => {
-                if (!deleting) {
-                    (e.currentTarget as HTMLButtonElement).style.background = 'rgba(239, 68, 68, 0.3)';
-                }
-            }}
-            onMouseLeave={e => {
-                (e.currentTarget as HTMLButtonElement).style.background = 'rgba(239, 68, 68, 0.15)';
-            }}
+            onMouseEnter={e => { if (!deleting) (e.currentTarget as HTMLButtonElement).style.textDecoration = 'underline'; }}
+            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.textDecoration = 'none'; }}
         >
-            {deleting ? '⏳' : '🗑️ Eliminar'}
+            {deleting ? 'Eliminando...' : 'Eliminar'}
         </button>
     );
 }

@@ -55,7 +55,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
                             <p className={styles.emptyState} style={{ padding: '1rem' }}>No hay sitios conectados.</p>
                         ) : (
                             project.sites.map(site => (
-                                <div key={site.id} className={styles.siteCard}>
+                                <div key={site.id} className={styles.siteCard} style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '0.75rem' }}>
                                     <div>
                                         <div style={{ fontWeight: '600' }}>{site.name}</div>
                                         <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{site.url}</div>
@@ -64,37 +64,40 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
                                         "use server";
                                         await syncCategories(site.id, project.id);
                                     }}>
-                                        <button type="submit" className="btn-primary" style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem' }}>
-                                            Sincronizar ({site.categories?.length || 0} Categorías)
+                                        <button type="submit" className="btn-primary" style={{ padding: '0.35rem 0.75rem', fontSize: '0.78rem' }}>
+                                            Sincronizar ({site.categories?.length || 0} Cat.)
                                         </button>
                                     </form>
                                 </div>
                             ))
                         )}
 
-                        <div style={{ marginTop: '2rem', borderTop: '1px solid var(--glass-border)', paddingTop: '1.5rem' }}>
-                            <h3 style={{ fontSize: '1rem', marginBottom: '1rem' }}>Agregar Sitio</h3>
-                            <form action={addSite}>
-                                <input type="hidden" name="projectId" value={project.id} />
-                                <div className={styles.formGroup}>
-                                    <label className={styles.label}>Nombre</label>
-                                    <input type="text" name="name" required className={styles.inputField} placeholder="Mi Blog" />
-                                </div>
-                                <div className={styles.formGroup}>
-                                    <label className={styles.label}>URL de WordPress</label>
-                                    <input type="url" name="url" required className={styles.inputField} placeholder="https://miblog.com" />
-                                </div>
-                                <div className={styles.formGroup}>
-                                    <label className={styles.label}>Usuario</label>
-                                    <input type="text" name="username" required className={styles.inputField} placeholder="admin" />
-                                </div>
-                                <div className={styles.formGroup}>
-                                    <label className={styles.label}>Password de Aplicación</label>
-                                    <input type="password" name="password" required className={styles.inputField} placeholder="xxxx xxxx xxxx xxxx" />
-                                </div>
-                                <button type="submit" className="btn-primary" style={{ width: '100%', marginTop: '0.5rem' }}>Conectar Sitio</button>
-                            </form>
-                        </div>
+                        {/* Only show 'Add Site' form if no sites are connected yet */}
+                        {project.sites.length === 0 && (
+                            <div style={{ marginTop: '2rem', borderTop: '1px solid var(--glass-border)', paddingTop: '1.5rem' }}>
+                                <h3 style={{ fontSize: '1rem', marginBottom: '1rem' }}>Agregar Sitio</h3>
+                                <form action={addSite}>
+                                    <input type="hidden" name="projectId" value={project.id} />
+                                    <div className={styles.formGroup}>
+                                        <label className={styles.label}>Nombre</label>
+                                        <input type="text" name="name" required className={styles.inputField} placeholder="Mi Blog" />
+                                    </div>
+                                    <div className={styles.formGroup}>
+                                        <label className={styles.label}>URL de WordPress</label>
+                                        <input type="url" name="url" required className={styles.inputField} placeholder="https://miblog.com" />
+                                    </div>
+                                    <div className={styles.formGroup}>
+                                        <label className={styles.label}>Usuario</label>
+                                        <input type="text" name="username" required className={styles.inputField} placeholder="admin" />
+                                    </div>
+                                    <div className={styles.formGroup}>
+                                        <label className={styles.label}>Password de Aplicación</label>
+                                        <input type="password" name="password" required className={styles.inputField} placeholder="xxxx xxxx xxxx xxxx" />
+                                    </div>
+                                    <button type="submit" className="btn-primary" style={{ width: '100%', marginTop: '0.5rem' }}>Conectar Sitio</button>
+                                </form>
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -142,13 +145,15 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
                                             <td style={{ padding: '1rem 0', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
                                                 {new Date(post.updatedAt).toLocaleDateString()}
                                             </td>
-                                            <td style={{ padding: '1rem 0', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                                                <Link href={`/projects/${project.id}/editor/${post.id}`} style={{ color: 'var(--accent-color)', fontSize: '0.9rem' }}>
-                                                    ✏️ Editar
-                                                </Link>
-                                                {post.status === 'draft' && (
-                                                    <DeleteDraftButton postId={post.id} postTitle={post.title || ''} />
-                                                )}
+                                            <td style={{ padding: '1rem 0' }}>
+                                                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '1rem' }}>
+                                                    <Link href={`/projects/${project.id}/editor/${post.id}`} style={{ color: 'var(--accent-color)', fontSize: '0.9rem' }}>
+                                                        Editar
+                                                    </Link>
+                                                    {post.status === 'draft' && (
+                                                        <DeleteDraftButton postId={post.id} postTitle={post.title || ''} />
+                                                    )}
+                                                </div>
                                             </td>
                                         </tr>
                                     ))}
