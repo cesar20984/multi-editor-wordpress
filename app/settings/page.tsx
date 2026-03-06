@@ -23,6 +23,7 @@ export default function SettingsPage() {
     const [defaultImagePrompt, setDefaultImagePrompt] = useState("");
     const [defaultInternalImagePrompt, setDefaultInternalImagePrompt] = useState("");
     const [defaultInfographicPrompt, setDefaultInfographicPrompt] = useState("");
+    const [insertContentPrompt, setInsertContentPrompt] = useState("");
 
     useEffect(() => {
         fetch("/api/settings")
@@ -43,6 +44,7 @@ export default function SettingsPage() {
                 setDefaultImagePrompt(data.settings.defaultImagePrompt);
                 setDefaultInternalImagePrompt(data.settings.defaultInternalImagePrompt);
                 setDefaultInfographicPrompt(data.settings.defaultInfographicPrompt);
+                setInsertContentPrompt(data.settings.insertContentPrompt || "");
                 setLoading(false);
             });
     }, []);
@@ -69,6 +71,7 @@ export default function SettingsPage() {
                 defaultImagePrompt,
                 defaultInternalImagePrompt,
                 defaultInfographicPrompt,
+                insertContentPrompt,
             })
         });
 
@@ -266,6 +269,21 @@ export default function SettingsPage() {
                         onChange={e => setDefaultInfographicPrompt(e.target.value)}
                         style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid var(--glass-border)', borderRadius: '8px', color: 'var(--text-primary)' }}
                     />
+                </div>
+
+                <div>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: "bold" }}>✍️ Insertar Contenido con IA (Clic Derecho)</label>
+                    <textarea
+                        name="insertContentPrompt"
+                        rows={4}
+                        value={insertContentPrompt}
+                        onChange={e => setInsertContentPrompt(e.target.value)}
+                        style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid var(--glass-border)', borderRadius: '8px', color: 'var(--text-primary)' }}
+                    />
+                    <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
+                        Controla cómo la IA genera el contenido al usar <b>✍️ Insertar Contenido</b> desde el menú de clic derecho.
+                        El sistema le pasa automáticamente el idioma del proyecto y el contexto del artículo.
+                    </p>
                 </div>
 
                 <button type="submit" className="btn-primary" disabled={saving} style={{ padding: '1rem', fontSize: '1.1rem', marginTop: '1rem' }}>

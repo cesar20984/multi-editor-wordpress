@@ -93,4 +93,5 @@ model Setting {
   imageSize             String   @default("1K")
   imageAspectRatio      String   @default("1:1")
   language              String   @default("Español")
+  insertContentPrompt   String   @default("Eres un redactor experto para blogs de WordPress. Genera contenido de calidad bien integrado con el artículo existente. Usa etiquetas HTML apropiadas (h2, h3, p, strong, ul, li). NO uses etiquetas html de nivel raíz (html, head, body). Genera SOLO el contenido pedido, sin repetir lo que ya existe en el artículo.")
 }

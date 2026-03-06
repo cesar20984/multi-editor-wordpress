@@ -563,12 +563,12 @@ export function AITiptapEditor({ project, settings, existingPost }: { project: a
         const textBefore = editor.state.doc.textBetween(Math.max(0, pos - 600), pos, ' ');
         const textAfter = editor.state.doc.textBetween(pos, Math.min(editor.state.doc.content.size, pos + 400), ' ');
         try {
-            const sys = `Eres un redactor experto para blogs de WordPress. Escribe en ${lang}. 
-El usuario quiere insertar contenido en un artículo. Genera el contenido solicitado usando etiquetas HTML apropiadas (h2, h3, p, strong, ul, li). 
-NO uses etiquetas html de nivel raíz (html, head, body). Solo el contenido a insertar.
+            const basePrompt = settings?.insertContentPrompt ||
+                "Eres un redactor experto para blogs de WordPress. Genera contenido de calidad bien integrado con el artículo existente. Usa etiquetas HTML apropiadas (h2, h3, p, strong, ul, li). NO uses etiquetas html de nivel raíz (html, head, body). Genera SOLO el contenido pedido, sin repetir lo que ya existe en el artículo.";
+            const sys = `${basePrompt}
+Escribe en ${lang}.
 El artículo tiene este contexto antes del cursor: "${textBefore.slice(-300)}"
-Y este contenido después: "${textAfter.slice(0, 300)}"
-Genera SOLO el contenido pedido, bien integrado con el contexto, sin repetir lo que ya existe.`;
+Y este contenido después: "${textAfter.slice(0, 300)}"`;
             const result = await generateAIText(`Instrucción: ${instruction}`, "custom", sys);
             editor.chain().focus().insertContentAt(pos, result).run();
             showToast("✅ Contenido insertado", "success");

@@ -25,6 +25,7 @@ export async function saveSettings(formData: FormData) {
             defaultMetaDescPrompt: formData.get("defaultMetaDescPrompt") as string,
             textModel: formData.get("textModel") as string,
             imageModel: formData.get("imageModel") as string,
+            insertContentPrompt: formData.get("insertContentPrompt") as string,
         }
     });
 
