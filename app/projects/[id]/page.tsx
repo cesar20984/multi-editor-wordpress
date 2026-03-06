@@ -7,7 +7,7 @@ import { syncCategories } from "@/app/actions/category";
 import { getSettings } from "@/app/actions/settings";
 import { ProjectLanguageSelector } from "@/components/ProjectLanguageSelector";
 
-export default async function ProjectPage({ params }: { params: { id: string } }) {
+export default async function ProjectPage({ params }: { params: Promise<{ id: string }> }) {
     const resolvedParams = await params;
 
     // Fetch project

@@ -5,7 +5,7 @@ import { getSettings } from "@/app/actions/settings";
 
 export const dynamic = 'force-dynamic';
 
-export default async function EditPostPage({ params }: { params: { id: string; postId: string } }) {
+export default async function EditPostPage({ params }: { params: Promise<{ id: string; postId: string }> }) {
     const resolvedParams = await params;
 
     const project = await prisma.project.findUnique({
