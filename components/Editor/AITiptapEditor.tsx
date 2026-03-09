@@ -192,31 +192,40 @@ export function AITiptapEditor({ project, settings, existingPost }: { project: a
 
     // Ensures a draft exists in DB and returns the postId
     // Used before image generation so images always have a valid postId to link to
+    const ensurePostIdPromise = useRef<Promise<string | null> | null>(null);
+
     const ensurePostId = useCallback(async (): Promise<string | null> => {
         if (postIdRef.current) return postIdRef.current;
-        // Force create an empty draft just to get an ID
-        try {
-            const res = await fetch("/api/posts/draft", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    projectId: project.id,
-                    title: stateRef.current.title || "Sin título",
-                    content: editor?.getHTML() || "",
-                    siteId: stateRef.current.siteId || null,
-                })
-            });
-            const data = await res.json();
-            if (data.success && data.post?.id) {
-                postIdRef.current = data.post.id;
-                setPostId(data.post.id);
-                window.history.replaceState(null, '', `/projects/${project.id}/editor/${data.post.id}`);
-                return data.post.id;
+        if (ensurePostIdPromise.current) return ensurePostIdPromise.current;
+
+        ensurePostIdPromise.current = (async () => {
+            try {
+                const res = await fetch("/api/posts/draft", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        projectId: project.id,
+                        title: stateRef.current.title || "Sin título",
+                        content: editor?.getHTML() || "",
+                        siteId: stateRef.current.siteId || null,
+                    })
+                });
+                const data = await res.json();
+                if (data.success && data.post?.id) {
+                    postIdRef.current = data.post.id;
+                    setPostId(data.post.id);
+                    window.history.replaceState(null, '', `/projects/${project.id}/editor/${data.post.id}`);
+                    return data.post.id;
+                }
+            } catch (e) {
+                console.error("Error creating draft for image:", e);
+            } finally {
+                ensurePostIdPromise.current = null;
             }
-        } catch (e) {
-            console.error("Error creating draft for image:", e);
-        }
-        return null;
+            return null;
+        })();
+
+        return ensurePostIdPromise.current;
     }, [editor, project.id]);
 
     // Saves just the HTML content immediately (used after inserting images)
@@ -296,7 +305,15 @@ export function AITiptapEditor({ project, settings, existingPost }: { project: a
             // Step 1: Generate Article Content
             setAiStep("✍️ Generando artículo...");
             const prompt = `${articlePrompt}\n\nTemática: ${topic}\n\nIdioma: ${lang}`;
-            const generatedHtml = await generateAIText(prompt, "custom", `Eres un redactor experto para blogs de WordPress. Escribe TODO el contenido en ${lang}. Usa etiquetas HTML apropiadas (h2, h3, p, strong, ul, li). No uses etiquetas html de nivel raiz, ni head, ni body. Solo el contenido principal.`);
+            let generatedHtml = await generateAIText(prompt, "custom", `Eres un redactor experto para blogs de WordPress. Escribe TODO el contenido en ${lang}. Usa etiquetas HTML apropiadas (h2, h3, p, strong, ul, li). No uses etiquetas html de nivel raiz, ni head, ni body. Solo el contenido principal.`);
+
+            // Step 1.5: Auto Humanize Content 
+            setAiStep("🧑‍🎨 Humanizando automáticamente el artículo...");
+            const baseHumanizePrompt = settings?.humanizeArticlePrompt || "Humaniza el siguiente texto para que parezca escrito por una persona real, no por una IA. Manten las imagenes intactas.";
+            const humanizeSys = `${baseHumanizePrompt}\n\nIMPORTANTE: El input contiene etiquetas HTML (<p>, <h2>, <img src="...">). DEBES mantener TODAS las etiquetas HTML, especialmente las imágenes (<img>). Tu salida debe ser HTML válido sin envolverlo en bloques de markdown (\`\`\`html) ni etiquetas globales como <html> o <body>. Responde SOLO con el HTML humanizado. Tienes prohibido omitir imágenes.`;
+            const humanizedResult = await generateAIText(`Reescribe y humaniza este HTML manteniendo las etiquetas:\n\n${generatedHtml}`, "custom", humanizeSys);
+            generatedHtml = humanizedResult.replace(/```html\n?/gi, '').replace(/```\n?/gi, '').trim();
+
             editor.commands.setContent(generatedHtml);
 
             // Step 2: Generate Title (should include keyword)
@@ -514,16 +531,24 @@ export function AITiptapEditor({ project, settings, existingPost }: { project: a
     };
 
     const handleAIGenerateImage = async (pos: number) => {
-        setLoadingAI(true);
         const textBefore = editor.state.doc.textBetween(Math.max(0, pos - 500), pos, ' ');
         const textAfter = editor.state.doc.textBetween(pos, Math.min(editor.state.doc.content.size, pos + 500), ' ');
+
+        const placeholderId = `img-placeholder-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        editor.chain().focus().insertContentAt(pos, {
+            type: 'image',
+            attrs: { src: "data:image/svg+xml;utf8,%3Csvg width='60' height='60' viewBox='0 0 50 50' xmlns='http://www.w3.org/2000/svg'%3E%3Ccircle cx='25' cy='25' r='20' fill='none' stroke='%233b82f6' stroke-width='4' stroke-dasharray='31.4 31.4' stroke-linecap='round'%3E%3CanimateTransform attributeName='transform' type='rotate' repeatCount='indefinite' dur='1s' keyTimes='0;1' values='0 25 25;360 25 25'%3E%3C/animateTransform%3E%3C/circle%3E%3C/svg%3E", alt: 'Generando...', title: placeholderId, class: 'aligncenter' }
+        }).run();
 
         try {
             // Always guarantee a postId exists before image generation
             const currentPostId = await ensurePostId();
             if (!currentPostId) {
                 showToast("No se pudo crear el borrador para guardar la imagen", "error");
-                setLoadingAI(false);
+                // Remove placeholder
+                let replacePos = -1;
+                editor.state.doc.descendants((node, p) => { if (node.type.name === 'image' && node.attrs.title === placeholderId) { replacePos = p; return false; } });
+                if (replacePos !== -1) editor.commands.deleteRange({ from: replacePos, to: replacePos + 1 });
                 return;
             }
 
@@ -543,36 +568,58 @@ export function AITiptapEditor({ project, settings, existingPost }: { project: a
                 headers: { "Content-Type": "application/json" }
             });
             const data = await res.json();
-            if (data.imageUrl) {
-                editor.chain().focus().insertContentAt(pos, {
-                    type: 'image',
-                    attrs: { src: data.imageUrl, alt: data.altText, title: data.finalPrompt, class: 'aligncenter' }
-                }).run();
 
-                // Save content immediately after inserting image URL
+            let replacePos = -1;
+            editor.state.doc.descendants((node, p) => {
+                if (node.type.name === 'image' && node.attrs.title === placeholderId) {
+                    replacePos = p;
+                    return false;
+                }
+            });
+
+            if (data.imageUrl && replacePos !== -1) {
+                const tr = editor.state.tr.setNodeMarkup(replacePos, undefined, {
+                    src: data.imageUrl,
+                    alt: data.altText,
+                    title: data.finalPrompt,
+                    class: 'aligncenter'
+                });
+                editor.view.dispatch(tr);
                 await saveContentNow();
-            } else {
+            } else if (replacePos !== -1) {
+                editor.commands.deleteRange({ from: replacePos, to: replacePos + 1 });
                 showToast(data.error || "Error al generar imagen", "error");
             }
         } catch (error) {
             console.error(error);
             showToast("Error al generar imagen", "error");
+            // Find and remote placeholder if error
+            let replacePos = -1;
+            editor.state.doc.descendants((node, p) => { if (node.type.name === 'image' && node.attrs.title === placeholderId) { replacePos = p; return false; } });
+            if (replacePos !== -1) editor.commands.deleteRange({ from: replacePos, to: replacePos + 1 });
         }
-        setLoadingAI(false);
     };
 
     // Infographic generation at cursor position
     const handleAIGenerateInfographic = async (pos: number) => {
-        setLoadingAI(true);
         const textBefore = editor.state.doc.textBetween(Math.max(0, pos - 500), pos, ' ');
         const textAfter = editor.state.doc.textBetween(pos, Math.min(editor.state.doc.content.size, pos + 500), ' ');
+
+        const placeholderId = `img-placeholder-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        editor.chain().focus().insertContentAt(pos, {
+            type: 'image',
+            attrs: { src: "data:image/svg+xml;utf8,%3Csvg width='60' height='60' viewBox='0 0 50 50' xmlns='http://www.w3.org/2000/svg'%3E%3Ccircle cx='25' cy='25' r='20' fill='none' stroke='%233b82f6' stroke-width='4' stroke-dasharray='31.4 31.4' stroke-linecap='round'%3E%3CanimateTransform attributeName='transform' type='rotate' repeatCount='indefinite' dur='1s' keyTimes='0;1' values='0 25 25;360 25 25'%3E%3C/animateTransform%3E%3C/circle%3E%3C/svg%3E", alt: 'Generando Infografía...', title: placeholderId, class: 'aligncenter' }
+        }).run();
 
         try {
             // Always guarantee a postId exists before image generation
             const currentPostId = await ensurePostId();
             if (!currentPostId) {
                 showToast("No se pudo crear el borrador para guardar la infografía", "error");
-                setLoadingAI(false);
+                // Remove placeholder
+                let replacePos = -1;
+                editor.state.doc.descendants((node, p) => { if (node.type.name === 'image' && node.attrs.title === placeholderId) { replacePos = p; return false; } });
+                if (replacePos !== -1) editor.commands.deleteRange({ from: replacePos, to: replacePos + 1 });
                 return;
             }
 
@@ -593,21 +640,36 @@ export function AITiptapEditor({ project, settings, existingPost }: { project: a
                 headers: { "Content-Type": "application/json" }
             });
             const data = await res.json();
-            if (data.imageUrl) {
-                editor.chain().focus().insertContentAt(pos, {
-                    type: 'image',
-                    attrs: { src: data.imageUrl, alt: data.altText, title: data.finalPrompt, class: 'aligncenter' }
-                }).run();
 
-                // Save content immediately after inserting infographic URL
+            let replacePos = -1;
+            editor.state.doc.descendants((node, p) => {
+                if (node.type.name === 'image' && node.attrs.title === placeholderId) {
+                    replacePos = p;
+                    return false;
+                }
+            });
+
+            if (data.imageUrl && replacePos !== -1) {
+                const tr = editor.state.tr.setNodeMarkup(replacePos, undefined, {
+                    src: data.imageUrl,
+                    alt: data.altText,
+                    title: data.finalPrompt,
+                    class: 'aligncenter'
+                });
+                editor.view.dispatch(tr);
                 await saveContentNow();
-            } else {
+            } else if (replacePos !== -1) {
+                editor.commands.deleteRange({ from: replacePos, to: replacePos + 1 });
                 showToast(data.error || "Error al generar infografía", "error");
             }
         } catch (error) {
             console.error(error);
+            showToast("Error al generar infografía", "error");
+            // Find and remote placeholder if error
+            let replacePos = -1;
+            editor.state.doc.descendants((node, p) => { if (node.type.name === 'image' && node.attrs.title === placeholderId) { replacePos = p; return false; } });
+            if (replacePos !== -1) editor.commands.deleteRange({ from: replacePos, to: replacePos + 1 });
         }
-        setLoadingAI(false);
     };
 
     const handleAIInsertContent = async (pos: number, instruction: string) => {
