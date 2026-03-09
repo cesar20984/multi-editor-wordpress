@@ -19,6 +19,7 @@ export async function POST(request: Request) {
         }
 
         const finalModel = model || settings?.imageModel || "dall-e-3";
+        const textModel = settings?.textModel || "gpt-4o-mini";
 
         // 1. Generate the image prompt based on type
         let imagePrompt = "A beautiful highly detailed illustration";
@@ -44,20 +45,35 @@ export async function POST(request: Request) {
         }
 
         try {
-            const promptResponse = await openai.chat.completions.create({
-                model: "gpt-4o-mini",
-                messages: [
-                    {
-                        role: "system",
-                        content: `You are an expert prompt engineer for AI image generators (DALL-E, Imagen). Your task is to read the user's instructions and the provided article context, and output ONLY the final, highly descriptive image prompt in ENGLISH. Do NOT output translations, explanations, or quotes. The prompt must be in ENGLISH because image models perform drastically better in English. Always respect the user's stylistic choices (e.g., if they say "real photo, natural, not professional", enforce that in your final prompt). STRICTLY stick to the context provided. Do not hallucinate unrelated subjects like forests unless explicitly mentioned.\n\nUser's Image Guidelines:\n${sysPrompt}`
-                    },
-                    {
-                        role: "user",
-                        content: `Article Title / Main Topic:\n${articleTitle || "Unknown"}\n\nArticle Context Before Cursor:\n${contextBefore}\n\nArticle Context After Cursor:\n${contextAfter}`
+            const systemPromptMsg = `You are an expert prompt engineer for AI image generators (DALL-E, Imagen). Your task is to read the user's instructions and the provided article context, and output ONLY the final, highly descriptive image prompt in ENGLISH. Do NOT output translations, explanations, or quotes. The prompt must be in ENGLISH because image models perform drastically better in English. Always respect the user's stylistic choices (e.g., if they say "real photo, natural, not professional", enforce that in your final prompt). STRICTLY stick to the context provided. Do not hallucinate unrelated subjects like forests unless explicitly mentioned.\n\nUser's Image Guidelines:\n${sysPrompt}`;
+            const userPromptMsg = `Article Title / Main Topic:\n${articleTitle || "Unknown"}\n\nArticle Context Before Cursor:\n${contextBefore}\n\nArticle Context After Cursor:\n${contextAfter}`;
+
+            if (textModel.includes("gemini")) {
+                const geminiKey = process.env.GEMINI_API_KEY;
+                if (geminiKey) {
+                    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${textModel}:generateContent?key=${geminiKey}`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            system_instruction: { parts: { text: systemPromptMsg } },
+                            contents: [{ parts: [{ text: userPromptMsg }] }]
+                        })
+                    });
+                    const data = await res.json();
+                    if (res.ok && data.candidates?.[0]?.content?.parts?.[0]?.text) {
+                        imagePrompt = data.candidates[0].content.parts[0].text.trim() || imagePrompt;
                     }
-                ],
-            });
-            imagePrompt = promptResponse.choices[0].message.content?.trim() || imagePrompt;
+                }
+            } else if (process.env.OPENAI_API_KEY) {
+                const promptResponse = await openai.chat.completions.create({
+                    model: textModel,
+                    messages: [
+                        { role: "system", content: systemPromptMsg },
+                        { role: "user", content: userPromptMsg }
+                    ],
+                });
+                imagePrompt = promptResponse.choices[0].message.content?.trim() || imagePrompt;
+            }
         } catch (e) { /* ignore, keep default prompt */ }
 
         // 2. Generate the image with the appropriate API
@@ -183,14 +199,35 @@ export async function POST(request: Request) {
         // 4. Generate a proper alt text in the selected language
         let altText = isInfographic ? "Infografía" : "Imagen del artículo";
         try {
-            const altResponse = await openai.chat.completions.create({
-                model: "gpt-4o-mini",
-                messages: [
-                    { role: "system", content: `Genera un texto alternativo (alt text) corto y descriptivo en ${lang} para una imagen de blog. Máximo 15 palabras. Solo el texto, sin comillas ni explicaciones.` },
-                    { role: "user", content: `Contexto del artículo: ${contextBefore?.slice(0, 500) || "artículo de blog"}\nDescripción de la imagen generada: ${imagePrompt}` }
-                ],
-            });
-            altText = altResponse.choices[0].message.content?.replace(/["']/g, '') || altText;
+            const systemAltMsg = `Genera un texto alternativo (alt text) corto y descriptivo en ${lang} para una imagen de blog. Máximo 15 palabras. Solo el texto, sin comillas ni explicaciones.`;
+            const userAltMsg = `Contexto del artículo: ${contextBefore?.slice(0, 500) || "artículo de blog"}\nDescripción de la imagen generada: ${imagePrompt}`;
+
+            if (textModel.includes("gemini")) {
+                const geminiKey = process.env.GEMINI_API_KEY;
+                if (geminiKey) {
+                    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${textModel}:generateContent?key=${geminiKey}`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            system_instruction: { parts: { text: systemAltMsg } },
+                            contents: [{ parts: [{ text: userAltMsg }] }]
+                        })
+                    });
+                    const data = await res.json();
+                    if (res.ok && data.candidates?.[0]?.content?.parts?.[0]?.text) {
+                        altText = data.candidates[0].content.parts[0].text.replace(/["']/g, '') || altText;
+                    }
+                }
+            } else if (process.env.OPENAI_API_KEY) {
+                const altResponse = await openai.chat.completions.create({
+                    model: textModel,
+                    messages: [
+                        { role: "system", content: systemAltMsg },
+                        { role: "user", content: userAltMsg }
+                    ],
+                });
+                altText = altResponse.choices[0].message.content?.replace(/["']/g, '') || altText;
+            }
         } catch (e) { /* keep default alt */ }
 
         const base64Image = `data:image/webp;base64,${webpBuffer.toString("base64")}`;
