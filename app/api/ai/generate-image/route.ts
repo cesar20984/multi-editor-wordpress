@@ -43,11 +43,17 @@ export async function POST(request: Request) {
             const promptResponse = await openai.chat.completions.create({
                 model: "gpt-4o-mini",
                 messages: [
-                    { role: "system", content: sysPrompt + `\n\nMUY IMPORTANTE: Describe la imagen y redacta el prompt FINAL EN ${lang}. Si es una infografía, incluye el texto exacto que debe aparecer en la imagen en ${lang}.` },
-                    { role: "user", content: `Contexto del artículo: ${contextBefore}\nContexto después: ${contextAfter}` }
+                    {
+                        role: "system",
+                        content: `You are an expert prompt engineer for AI image generators (DALL-E, Imagen). Your task is to read the user's instructions and the provided article context, and output ONLY the final, highly descriptive image prompt in ENGLISH. Do NOT output translations, explanations, or quotes. The prompt must be in ENGLISH because image models perform drastically better in English. Always respect the user's stylistic choices (e.g., if they say "real photo, natural, not professional", enforce that in your final prompt). STRICTLY stick to the context provided. Do not hallucinate unrelated subjects like forests unless explicitly mentioned.\n\nUser's Image Guidelines:\n${sysPrompt}`
+                    },
+                    {
+                        role: "user",
+                        content: `Article Context Before Cursor:\n${contextBefore}\n\nArticle Context After Cursor:\n${contextAfter}`
+                    }
                 ],
             });
-            imagePrompt = promptResponse.choices[0].message.content || imagePrompt;
+            imagePrompt = promptResponse.choices[0].message.content?.trim() || imagePrompt;
         } catch (e) { /* ignore, keep default prompt */ }
 
         // 2. Generate the image with the appropriate API
