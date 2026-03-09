@@ -220,7 +220,8 @@ export async function POST(request: Request) {
 
         return NextResponse.json({
             imageUrl: finalImageUrl,
-            altText
+            altText,
+            finalPrompt: imagePrompt
         });
 
     } catch (error: any) {

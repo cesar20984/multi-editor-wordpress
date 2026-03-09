@@ -77,6 +77,7 @@ export function AITiptapEditor({ project, settings, existingPost }: { project: a
     const [featuredImage, setFeaturedImage] = useState<string | null>(existingPost?.featuredImg || null);
     const [featuredImageAlt, setFeaturedImageAlt] = useState(existingPost?.title || "");
     const [featuredImagePrompt, setFeaturedImagePrompt] = useState("");
+    const [featuredImagePromptUsed, setFeaturedImagePromptUsed] = useState("");
 
     // Default siteId to the first site if available
     const [siteId, setSiteId] = useState(existingPost?.siteId || (project.sites.length > 0 ? project.sites[0].id : ""));
@@ -370,6 +371,7 @@ export function AITiptapEditor({ project, settings, existingPost }: { project: a
 
                     // Force a save after setting the featured image
                     stateRef.current.featuredImage = imgData.imageUrl;
+                    setFeaturedImagePromptUsed(imgData.finalPrompt || "");
                     await saveDraft();
                     showToast("🖼️ ¡Imagen destacada generada!", "success");
                 }
@@ -544,7 +546,7 @@ export function AITiptapEditor({ project, settings, existingPost }: { project: a
             if (data.imageUrl) {
                 editor.chain().focus().insertContentAt(pos, {
                     type: 'image',
-                    attrs: { src: data.imageUrl, alt: data.altText, class: 'aligncenter' }
+                    attrs: { src: data.imageUrl, alt: data.altText, title: data.finalPrompt, class: 'aligncenter' }
                 }).run();
 
                 // Save content immediately after inserting image URL
@@ -594,7 +596,7 @@ export function AITiptapEditor({ project, settings, existingPost }: { project: a
             if (data.imageUrl) {
                 editor.chain().focus().insertContentAt(pos, {
                     type: 'image',
-                    attrs: { src: data.imageUrl, alt: data.altText, class: 'aligncenter' }
+                    attrs: { src: data.imageUrl, alt: data.altText, title: data.finalPrompt, class: 'aligncenter' }
                 }).run();
 
                 // Save content immediately after inserting infographic URL
@@ -669,6 +671,7 @@ export function AITiptapEditor({ project, settings, existingPost }: { project: a
             if (data.imageUrl) {
                 setFeaturedImage(data.imageUrl);
                 setFeaturedImageAlt(data.altText || title || "Imagen destacada del artículo");
+                setFeaturedImagePromptUsed(data.finalPrompt || "");
 
                 // Force a save after setting the featured image
                 stateRef.current.featuredImage = data.imageUrl;
@@ -1157,6 +1160,13 @@ export function AITiptapEditor({ project, settings, existingPost }: { project: a
                                         cursor: 'pointer', fontSize: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center'
                                     }}
                                 >✕</button>
+
+                                {featuredImagePromptUsed && (
+                                    <div style={{ marginTop: '0.75rem', padding: '0.75rem', background: 'rgba(0,0,0,0.2)', borderRadius: '6px', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                                        <div style={{ fontWeight: 'bold', marginBottom: '0.25rem' }}>Prompt Utilizado por la IA:</div>
+                                        <div style={{ fontStyle: 'italic', wordBreak: 'break-word' }}>"{featuredImagePromptUsed}"</div>
+                                    </div>
+                                )}
                             </div>
                         ) : (
                             <div style={{
