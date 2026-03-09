@@ -131,6 +131,7 @@ export async function publishPost(data: FormData) {
     const wpPostData: any = {
         title: title,
         content: content,
+        excerpt: metaDesc || "",
         slug: slug || "",
         status: "publish",
         categories: [category.wpId],
