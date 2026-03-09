@@ -9,7 +9,7 @@ const openai = new OpenAI({
 
 export async function POST(request: Request) {
     try {
-        const { contextBefore, contextAfter, articleTitle, wordPressSiteId, model, isFeatured, isInfographic, imageSize, imageAspectRatio, language, postId } = await request.json();
+        const { contextBefore, contextAfter, articleTitle, wordPressSiteId, model, isFeatured, isInfographic, imageSize, imageAspectRatio, language, postId, customPrompt } = await request.json();
         const settings = await (prisma as any).setting.findFirst();
 
         const lang = language || settings?.language || "Español";
@@ -37,6 +37,10 @@ export async function POST(request: Request) {
                 .replace("{BEFORE}", contextBefore || "artículo")
                 .replace("{AFTER}", contextAfter || "artículo");
             sysPrompt = internalPrompt;
+        }
+
+        if (customPrompt) {
+            sysPrompt += `\n\nCRITICAL USER INSTRUCTION FOR THIS SPECIFIC IMAGE: "${customPrompt}". You MUST enforce this specific instruction.`;
         }
 
         try {

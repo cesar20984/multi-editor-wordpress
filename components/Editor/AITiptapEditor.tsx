@@ -76,6 +76,7 @@ export function AITiptapEditor({ project, settings, existingPost }: { project: a
     // Featured image
     const [featuredImage, setFeaturedImage] = useState<string | null>(existingPost?.featuredImg || null);
     const [featuredImageAlt, setFeaturedImageAlt] = useState(existingPost?.title || "");
+    const [featuredImagePrompt, setFeaturedImagePrompt] = useState("");
 
     // Default siteId to the first site if available
     const [siteId, setSiteId] = useState(existingPost?.siteId || (project.sites.length > 0 ? project.sites[0].id : ""));
@@ -357,7 +358,8 @@ export function AITiptapEditor({ project, settings, existingPost }: { project: a
                         imageSize: settings?.imageSize || "1K",
                         imageAspectRatio: settings?.imageAspectRatio || "1:1",
                         language: lang,
-                        postId: currentPostId
+                        postId: currentPostId,
+                        customPrompt: featuredImagePrompt
                     }),
                     headers: { "Content-Type": "application/json" }
                 });
@@ -658,7 +660,8 @@ export function AITiptapEditor({ project, settings, existingPost }: { project: a
                     imageSize: settings?.imageSize || "1K",
                     imageAspectRatio: settings?.imageAspectRatio || "1:1",
                     language: project.language || settings?.language || "Español",
-                    postId: currentPostId
+                    postId: currentPostId,
+                    customPrompt: featuredImagePrompt
                 }),
                 headers: { "Content-Type": "application/json" }
             });
@@ -1171,6 +1174,19 @@ export function AITiptapEditor({ project, settings, existingPost }: { project: a
                         <style>{`
                             @keyframes spin { to { transform: rotate(360deg); } }
                         `}</style>
+
+                        <textarea
+                            rows={2}
+                            placeholder="Instrucciones adicionales para la IA al generar esta imagen (opcional)..."
+                            value={featuredImagePrompt}
+                            onChange={(e) => setFeaturedImagePrompt(e.target.value)}
+                            style={{
+                                width: '100%', padding: '0.5rem', marginBottom: '0.5rem',
+                                background: 'rgba(15, 23, 42, 0.6)', border: '1px solid var(--glass-border)',
+                                borderRadius: '6px', color: 'var(--text-primary)', fontSize: '0.85rem',
+                                resize: 'vertical'
+                            }}
+                        />
 
                         <input
                             type="text"
