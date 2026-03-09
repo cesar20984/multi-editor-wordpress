@@ -9,7 +9,7 @@ const openai = new OpenAI({
 
 export async function POST(request: Request) {
     try {
-        const { contextBefore, contextAfter, wordPressSiteId, model, isFeatured, isInfographic, imageSize, imageAspectRatio, language, postId } = await request.json();
+        const { contextBefore, contextAfter, articleTitle, wordPressSiteId, model, isFeatured, isInfographic, imageSize, imageAspectRatio, language, postId } = await request.json();
         const settings = await (prisma as any).setting.findFirst();
 
         const lang = language || settings?.language || "Español";
@@ -49,7 +49,7 @@ export async function POST(request: Request) {
                     },
                     {
                         role: "user",
-                        content: `Article Context Before Cursor:\n${contextBefore}\n\nArticle Context After Cursor:\n${contextAfter}`
+                        content: `Article Title / Main Topic:\n${articleTitle || "Unknown"}\n\nArticle Context Before Cursor:\n${contextBefore}\n\nArticle Context After Cursor:\n${contextAfter}`
                     }
                 ],
             });

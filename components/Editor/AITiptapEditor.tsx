@@ -528,6 +528,7 @@ export function AITiptapEditor({ project, settings, existingPost }: { project: a
                 body: JSON.stringify({
                     contextBefore: textBefore,
                     contextAfter: textAfter,
+                    articleTitle: title,
                     wordPressSiteId: siteId,
                     model: settings?.imageModel || "dall-e-3",
                     imageSize: settings?.imageSize || "1K",
@@ -576,6 +577,7 @@ export function AITiptapEditor({ project, settings, existingPost }: { project: a
                 body: JSON.stringify({
                     contextBefore: textBefore,
                     contextAfter: textAfter,
+                    articleTitle: title,
                     wordPressSiteId: siteId,
                     model: settings?.imageModel || "dall-e-3",
                     imageSize: settings?.imageSize || "1K",
