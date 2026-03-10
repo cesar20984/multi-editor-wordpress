@@ -23,8 +23,9 @@ export default async function Home() {
         </div>
       </div>
 
+      <CreateProjectForm />
+
       <div className={styles.grid}>
-        <CreateProjectForm />
 
         {projects.map(project => (
           <Link href={`/projects/${project.id}`} key={project.id} className={`glass-panel ${styles.projectCard}`} style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
