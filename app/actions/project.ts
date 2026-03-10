@@ -15,7 +15,6 @@ export async function createProject(formData: FormData) {
     const project = await prisma.project.create({
         data: {
             name: name.trim(),
-            language: settings?.language || "Español",
         },
     });
 

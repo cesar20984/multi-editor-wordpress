@@ -3,6 +3,7 @@ import styles from "./page.module.css";
 import { createProject } from "./actions/project";
 import { prisma } from "@/lib/prisma";
 import { DeleteProjectButton } from "@/components/Project/DeleteProjectButton";
+import { CreateProjectForm } from "@/components/Project/CreateProjectForm";
 
 export default async function Home() {
   const projects = await prisma.project.findMany({
@@ -23,28 +24,7 @@ export default async function Home() {
       </div>
 
       <div className={styles.grid}>
-        <form action={createProject} className={`glass-panel ${styles.projectCard} ${styles.createCard}`} style={{ width: '100%', display: 'flex', flexDirection: 'column', padding: '1.5rem', justifyContent: 'center', alignItems: 'center' }}>
-          <div style={{ marginBottom: '1rem', fontWeight: 'bold', fontSize: '1.1rem' }}>✚ Crear Nuevo Proyecto</div>
-          <input
-            type="text"
-            name="name"
-            placeholder="Nombre del proyecto..."
-            required
-            style={{
-              marginBottom: '1rem',
-              padding: '0.75rem',
-              background: 'rgba(15, 23, 42, 0.6)',
-              border: '1px solid var(--glass-border)',
-              borderRadius: '8px',
-              color: 'var(--text-primary)',
-              width: '100%',
-              outline: 'none'
-            }}
-          />
-          <button type="submit" className="btn-primary" style={{ width: '100%' }}>
-            Crear Proyecto
-          </button>
-        </form>
+        <CreateProjectForm />
 
         {projects.map(project => (
           <Link href={`/projects/${project.id}`} key={project.id} className={`glass-panel ${styles.projectCard}`} style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
