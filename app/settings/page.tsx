@@ -49,9 +49,17 @@ export default function SettingsPage() {
                 setInsertContentPrompt(data.settings.insertContentPrompt || "");
                 setHumanizeArticlePrompt(data.settings.humanizeArticlePrompt || "");
                 setHumanizeSelectionPrompt(data.settings.humanizeSelectionPrompt || "");
+                setHumanizeSelectionPrompt(data.settings.humanizeSelectionPrompt || "");
                 setLoading(false);
             });
     }, []);
+
+    const fetchModels = async () => {
+        const res = await fetch("/api/settings?t=" + new Date().getTime(), { cache: 'no-store' });
+        const data = await res.json();
+        if (data.textModels) setTextModels(data.textModels);
+        if (data.imageModels) setImageModels(data.imageModels);
+    };
 
     const handleSave = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -131,9 +139,14 @@ export default function SettingsPage() {
                     <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>Todos los textos generados, alt texts e infografías se generarán en este idioma.</p>
                 </div>
 
-                <h2 style={{ fontSize: '1.25rem', borderBottom: '1px solid var(--glass-border)', paddingBottom: '0.5rem', marginBottom: '0.5rem', marginTop: '1rem' }}>
-                    Modelos de Inteligencia Artificial
-                </h2>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--glass-border)', paddingBottom: '0.5rem', marginBottom: '0.5rem', marginTop: '1rem' }}>
+                    <h2 style={{ fontSize: '1.25rem', margin: 0 }}>
+                        Modelos de Inteligencia Artificial
+                    </h2>
+                    <button type="button" onClick={fetchModels} style={{ background: 'var(--glass-border)', border: 'none', padding: '0.4rem 0.8rem', borderRadius: '4px', color: '#fff', cursor: 'pointer', fontSize: '0.8rem' }}>
+                        🔄 Refrescar Lista
+                    </button>
+                </div>
 
                 <div style={{ display: 'flex', gap: '2rem' }}>
                     <div style={{ flex: 1 }}>
@@ -157,17 +170,16 @@ export default function SettingsPage() {
                     </div>
                 </div>
 
-                {/* Nano Banana 2 Image Config */}
-                {(imageModel.includes('gemini') || imageModel.includes('nano-banana') || imageModel.includes('image')) && (
-                    <div style={{ background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.25)', borderRadius: '10px', padding: '1.25rem', marginTop: '0.5rem' }}>
-                        <h3 style={{ fontSize: '1rem', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                            <span>🍌</span> Configuración Nano Banana / Gemini Image
-                        </h3>
-                        <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '1rem' }}>
-                            Estos ajustes aplican solo cuando usas modelos nativos de imagen de Gemini (Nano Banana 2 / gemini-*-image-*).
-                        </p>
-                        <div style={{ display: 'flex', gap: '2rem' }}>
-                            <div style={{ flex: 1 }}>
+                {/* Universal Image Config */}
+                <div style={{ background: 'rgba(59, 130, 246, 0.08)', border: '1px solid rgba(59, 130, 246, 0.25)', borderRadius: '10px', padding: '1.25rem', marginTop: '0.5rem' }}>
+                    <h3 style={{ fontSize: '1rem', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <span>🎨</span> Configuración de Imágenes (Tamaño y Proporciones)
+                    </h3>
+                    <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '1rem' }}>
+                        Estos ajustes aplican tanto para imágenes destacadas como internas. Nota: DALL-E 3 de OpenAI forzará resolución cuadrada si usas proporciones no soportadas; para tamaños libres como 512px prefiere usar DALL-E 2 o Gemini.
+                    </p>
+                    <div style={{ display: 'flex', gap: '2rem' }}>
+                        <div style={{ flex: 1 }}>
                                 <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', fontSize: '0.9rem' }}>Resolución (image_size)</label>
                                 <select value={imageSize} onChange={e => setImageSize(e.target.value)} style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid var(--glass-border)', borderRadius: '8px', color: 'var(--text-primary)' }}>
                                     <option value="512px">512px — Baja resolución (rápido)</option>
@@ -191,7 +203,6 @@ export default function SettingsPage() {
                             </div>
                         </div>
                     </div>
-                )}
 
                 <h2 style={{ fontSize: '1.25rem', borderBottom: '1px solid var(--glass-border)', paddingBottom: '0.5rem', marginBottom: '0.5rem', marginTop: '1rem' }}>
                     Prompts Predeterminados

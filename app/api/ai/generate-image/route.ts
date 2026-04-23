@@ -157,7 +157,9 @@ export async function POST(request: Request) {
         } else {
             // ---- OpenAI DALL-E ----
             let dallESize = "1024x1024";
-            if (imageSize === "512px") dallESize = "512x512";
+            if (imageSize === "512px" && finalModel === "dall-e-2") dallESize = "512x512";
+            else if (imageSize === "256px" && finalModel === "dall-e-2") dallESize = "256x256";
+            else if (imageSize === "512px") dallESize = "1024x1024"; // DALL-E 3 doesn't support 512px natively
             else if (imageSize === "1K") dallESize = "1024x1024";
 
             const imageResponse = await openai.images.generate({
