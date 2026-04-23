@@ -7,6 +7,7 @@ import { syncCategories } from "@/app/actions/category";
 import { getSettings } from "@/app/actions/settings";
 import { ProjectLanguageSelector } from "@/components/ProjectLanguageSelector";
 import { DeleteDraftButton } from "@/components/DeleteDraftButton";
+import { BulkGenerator } from "@/components/Project/BulkGenerator";
 
 export default async function ProjectPage({ params }: { params: Promise<{ id: string }> }) {
     const resolvedParams = await params;
@@ -21,7 +22,8 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
                 }
             },
             posts: {
-                orderBy: { updatedAt: 'desc' }
+                orderBy: { updatedAt: 'desc' },
+                include: { site: true }
             }
         }
     });
@@ -106,9 +108,12 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
                     <div className="glass-panel">
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
                             <h2 style={{ fontSize: '1.5rem' }}>Publicaciones</h2>
-                            <Link href={`/projects/${project.id}/editor`} className="btn-primary">
-                                + Crear Contenido
-                            </Link>
+                            <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                                <BulkGenerator projectId={project.id} />
+                                <Link href={`/projects/${project.id}/editor`} className="btn-primary">
+                                    + Crear Contenido
+                                </Link>
+                            </div>
                         </div>
 
                         {project.posts.length === 0 ? (
@@ -150,6 +155,16 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
                                                     <Link href={`/projects/${project.id}/editor/${post.id}`} style={{ color: 'var(--accent-color)', fontSize: '0.9rem' }}>
                                                         Editar
                                                     </Link>
+                                                    {post.status === 'published' && post.site && post.wpPostId && (
+                                                        <a 
+                                                            href={`${post.site.url}/?p=${post.wpPostId}`} 
+                                                            target="_blank" 
+                                                            rel="noopener noreferrer" 
+                                                            style={{ color: 'var(--success-color)', fontSize: '0.9rem' }}
+                                                        >
+                                                            Ver ↗
+                                                        </a>
+                                                    )}
                                                     {post.status === 'draft' && (
                                                         <DeleteDraftButton postId={post.id} postTitle={post.title || ''} />
                                                     )}

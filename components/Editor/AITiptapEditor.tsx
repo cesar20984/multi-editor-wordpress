@@ -8,7 +8,7 @@ import Image from '@tiptap/extension-image';
 import styles from './AITiptapEditor.module.css';
 import { useState, useCallback, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 
 interface ExistingPost {
     id: string;
@@ -25,6 +25,8 @@ interface ExistingPost {
 
 export function AITiptapEditor({ project, settings, existingPost }: { project: any, settings: any, existingPost?: ExistingPost }) {
     const router = useRouter();
+    const searchParams = useSearchParams();
+    const initialAutogenerateTriggered = useRef(false);
     const [contextMenu, setContextMenu] = useState<{ x: number; y: number; show: boolean; pos: number } | null>(null);
     const [loadingAI, setLoadingAI] = useState(false);
     const [aiStep, setAiStep] = useState<string | null>(null);
@@ -66,6 +68,23 @@ export function AITiptapEditor({ project, settings, existingPost }: { project: a
     // AI Generation States
     const [topic, setTopic] = useState("");
     const [articlePrompt, setArticlePrompt] = useState(settings?.defaultArticlePrompt || "Escribe un artículo detallado sobre...");
+
+    // Auto-generate on mount if instructed by bulk generator
+    useEffect(() => {
+        if (initialAutogenerateTriggered.current) return;
+        const topicParam = searchParams.get('topic');
+        const autoGenParam = searchParams.get('autogenerate');
+        
+        if (topicParam && !existingPost?.id) { // Only auto-generate for new posts
+            setTopic(topicParam);
+            if (autoGenParam === 'true') {
+                initialAutogenerateTriggered.current = true;
+                setTimeout(() => {
+                    handleAIGenerateArticle(topicParam);
+                }, 800);
+            }
+        }
+    }, [searchParams, existingPost]);
 
     // Form states
     const [title, setTitle] = useState(existingPost?.title || "");
@@ -296,15 +315,18 @@ export function AITiptapEditor({ project, settings, existingPost }: { project: a
         return data.text;
     };
 
-    const handleAIGenerateArticle = async () => {
-        if (!topic.trim()) return showToast("Por favor ingresa una temática para el artículo.", "error");
+    const handleAIGenerateArticle = async (overrideTopic?: string | React.MouseEvent) => {
+        // Because of how onClick passes the Event object sometimes, we ensure overrideTopic is a string or fallback to state
+        const targetTopic = typeof overrideTopic === 'string' ? overrideTopic : topic;
+        
+        if (!targetTopic.trim()) return showToast("Por favor ingresa una temática para el artículo.", "error");
         setLoadingAI(true);
         const lang = project.language || settings?.language || "Español";
 
         try {
             // Step 1: Generate Article Content
             setAiStep("✍️ Generando artículo...");
-            const prompt = `${articlePrompt}\n\nTemática: ${topic}\n\nIdioma: ${lang}`;
+            const prompt = `${articlePrompt}\n\nTemática: ${targetTopic}\n\nIdioma: ${lang}`;
             let generatedHtml = await generateAIText(prompt, "custom", `Eres un redactor experto para blogs de WordPress. Escribe TODO el contenido en ${lang}. Usa etiquetas HTML apropiadas (h2, h3, p, strong, ul, li). No uses etiquetas html de nivel raiz, ni head, ni body. Solo el contenido principal.`);
 
             // Step 1.5: Auto Humanize Content 
@@ -318,19 +340,19 @@ export function AITiptapEditor({ project, settings, existingPost }: { project: a
 
             // Step 2: Generate Title (should include keyword)
             setAiStep("📌 Generando título...");
-            const titleSys = (settings?.defaultTitlePrompt || "Eres un experto en SEO. Genera solo un título optimizado (H1). Sin comillas.") + ` Escribe en ${lang}. MUY IMPORTANTE: El título debe centrarse en el tema: "${topic}". Si el tema es una instrucción, extrae la idea principal y haz un título real. NO repitas la instrucción original.`;
+            const titleSys = (settings?.defaultTitlePrompt || "Eres un experto en SEO. Genera solo un título optimizado (H1). Sin comillas.") + ` Escribe en ${lang}. MUY IMPORTANTE: El título debe centrarse en el tema: "${targetTopic}". Si el tema es una instrucción, extrae la idea principal y haz un título real. NO repitas la instrucción original.`;
             const genTitle = await generateAIText(`Base content context details: ${editor.getText().slice(0, 1500)}`, "custom", titleSys);
             setTitle(genTitle.replace(/["']/g, '').replace(/^Título:|^Title:/i, '').trim());
 
             // Step 3: Generate Meta Title (should include keyword, catchy but correct)
             setAiStep("🏷️ Generando meta título...");
-            const metaTitleSys = (settings?.defaultMetaTitlePrompt || "Genera solo el meta título directo para Google. Sin comillas.") + ` Escribe en ${lang}. Debe ser un Meta Título profesional sobre "${topic}". NO repitas instrucciones.`;
+            const metaTitleSys = (settings?.defaultMetaTitlePrompt || "Genera solo el meta título directo para Google. Sin comillas.") + ` Escribe en ${lang}. Debe ser un Meta Título profesional sobre "${targetTopic}". NO repitas instrucciones.`;
             const genMetaTitle = await generateAIText(`Base content context details: ${editor.getText().slice(0, 1500)}`, "custom", metaTitleSys);
             setMetaTitle(genMetaTitle.replace(/["']/g, '').replace(/^Meta Título:|^Meta Title:/i, '').trim());
 
             // Step 4: Generate Slug (very concise)
             setAiStep("🔗 Generando URL...");
-            const slugSys = `Genera un slug de URL (3-4 palabras) basado en el tema: "${topic}". Minúsculas, guiones, SOLO el slug. Sin prefijos.`;
+            const slugSys = `Genera un slug de URL (3-4 palabras) basado en el tema: "${targetTopic}". Minúsculas, guiones, SOLO el slug. Sin prefijos.`;
             const genSlug = await generateAIText(`Contenido: ${genTitle}`, "custom", slugSys);
             setSlug(genSlug.toLowerCase().replace(/["']/g, '').replace(/^Slug:|^URL:/i, '').replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-').trim());
 
