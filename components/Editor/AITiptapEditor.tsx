@@ -69,23 +69,6 @@ export function AITiptapEditor({ project, settings, existingPost }: { project: a
     const [topic, setTopic] = useState("");
     const [articlePrompt, setArticlePrompt] = useState(settings?.defaultArticlePrompt || "Escribe un artículo detallado sobre...");
 
-    // Auto-generate on mount if instructed by bulk generator
-    useEffect(() => {
-        if (initialAutogenerateTriggered.current) return;
-        const topicParam = searchParams.get('topic');
-        const autoGenParam = searchParams.get('autogenerate');
-        
-        if (topicParam && !existingPost?.id) { // Only auto-generate for new posts
-            setTopic(topicParam);
-            if (autoGenParam === 'true') {
-                initialAutogenerateTriggered.current = true;
-                setTimeout(() => {
-                    handleAIGenerateArticle(topicParam);
-                }, 800);
-            }
-        }
-    }, [searchParams, existingPost]);
-
     // Form states
     const [title, setTitle] = useState(existingPost?.title || "");
     const [slug, setSlug] = useState(existingPost?.slug || "");
@@ -121,6 +104,23 @@ export function AITiptapEditor({ project, settings, existingPost }: { project: a
         content: existingPost?.content || '',
         immediatelyRender: false,
     });
+
+    // Auto-generate on mount if instructed by bulk generator
+    useEffect(() => {
+        if (initialAutogenerateTriggered.current || !editor) return;
+        const topicParam = searchParams.get('topic');
+        const autoGenParam = searchParams.get('autogenerate');
+        
+        if (topicParam && !existingPost?.id) { // Only auto-generate for new posts
+            setTopic(topicParam);
+            if (autoGenParam === 'true') {
+                initialAutogenerateTriggered.current = true;
+                setTimeout(() => {
+                    handleAIGenerateArticle(topicParam);
+                }, 500); // Trigger generation shortly after editor is ready
+            }
+        }
+    }, [searchParams, existingPost, editor]);
 
     const handleContextMenu = useCallback((e: React.MouseEvent) => {
         e.preventDefault();
