@@ -28,8 +28,16 @@ export async function GET() {
                 if (res.ok) {
                     const data = await res.json();
                     const models = data.data as any[];
-                    textModels.push(...models.filter(m => m.id.startsWith("gpt-") || m.id.startsWith("o1")).map(m => m.id));
-                    imageModels.push(...models.filter(m => m.id.startsWith("dall-e")).map(m => m.id));
+                    
+                    // GPT Text & o1 models
+                    textModels.push(...models
+                        .filter(m => (m.id.startsWith("gpt-") && !m.id.startsWith("gpt-image")) || m.id.startsWith("o1"))
+                        .map(m => m.id));
+                    
+                    // DALL-E and GPT Image models
+                    imageModels.push(...models
+                        .filter(m => m.id.startsWith("dall-e") || m.id.startsWith("gpt-image"))
+                        .map(m => m.id));
                 }
             } catch (e) { console.error("OpenAI fetch error:", e); }
         }
