@@ -23,6 +23,8 @@ export async function saveSettings(formData: FormData) {
             defaultTitlePrompt: formData.get("defaultTitlePrompt") as string,
             defaultMetaTitlePrompt: formData.get("defaultMetaTitlePrompt") as string,
             defaultMetaDescPrompt: formData.get("defaultMetaDescPrompt") as string,
+            defaultImagePrompt: formData.get("defaultImagePrompt") as string,
+            imageSystemPrompt: formData.get("imageSystemPrompt") as string,
             textModel: formData.get("textModel") as string,
             imageModel: formData.get("imageModel") as string,
             insertContentPrompt: formData.get("insertContentPrompt") as string,

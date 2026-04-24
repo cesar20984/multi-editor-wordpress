@@ -1200,7 +1200,7 @@ export function AITiptapEditor({ project, settings, existingPost }: { project: a
             </div>
 
             <div style={{ width: '350px', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-                <div className="glass-panel" style={{ flex: 1, overflowY: 'auto' }}>
+                <div className="glass-panel" style={{ flex: 1 }}>
                     <h3 style={{ marginBottom: '1.5rem', fontSize: '1.25rem' }}>Configuración de Publicación</h3>
 
                     {/* Featured Image Section */}

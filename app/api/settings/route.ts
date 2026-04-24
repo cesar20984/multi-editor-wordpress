@@ -85,7 +85,7 @@ export async function POST(request: Request) {
         const {
             id, textModel, imageModel, imageSize, imageAspectRatio, language,
             defaultArticlePrompt, defaultTitlePrompt, defaultMetaTitlePrompt, defaultMetaDescPrompt,
-            defaultImagePrompt, defaultInternalImagePrompt, defaultInfographicPrompt, insertContentPrompt,
+            defaultImagePrompt, defaultInternalImagePrompt, defaultInfographicPrompt, imageSystemPrompt, insertContentPrompt,
             humanizeArticlePrompt, humanizeSelectionPrompt
         } = body;
 
@@ -104,6 +104,7 @@ export async function POST(request: Request) {
                 defaultImagePrompt,
                 defaultInternalImagePrompt,
                 defaultInfographicPrompt,
+                ...(imageSystemPrompt !== undefined && { imageSystemPrompt }),
                 ...(insertContentPrompt !== undefined && { insertContentPrompt }),
                 ...(humanizeArticlePrompt !== undefined && { humanizeArticlePrompt }),
                 ...(humanizeSelectionPrompt !== undefined && { humanizeSelectionPrompt }),

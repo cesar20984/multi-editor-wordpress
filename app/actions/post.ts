@@ -86,13 +86,15 @@ export async function publishPost(data: FormData) {
         return null;
     }
 
+    const baseFileName = slug || title.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+
     // 1. Upload featured image if provided
     let featuredMediaId: number | null = null;
     if (featuredImageBase64) {
         try {
             const imgData = await getImageData(featuredImageBase64);
             if (imgData) {
-                const filename = `featured-${Date.now()}.${imgData.type}`;
+                const filename = `${baseFileName}-destacada-${Date.now()}.${imgData.type}`;
                 const result = await uploadImageToWP(imgData.buffer, filename, `image/${imgData.type}`, featuredImageAlt);
                 if (result) featuredMediaId = result.id;
             }
@@ -106,16 +108,17 @@ export async function publishPost(data: FormData) {
     const imgRegex = /<img[^>]+src="([^"]+)"[^>]*alt="([^"]*)"[^>]*>/gi;
     const matches = [...content.matchAll(imgRegex)];
 
+    let internalImgCounter = 1;
     for (const match of matches) {
         const fullMatch = match[0];
         const imgSrc = match[1];
-        const altText = match[2] || "imagen generada ai";
+        const altText = match[2] || "imagen del articulo";
 
         if (imgSrc.startsWith("data:image/") || imgSrc.includes("/api/images/")) {
             try {
                 const imgData = await getImageData(imgSrc);
                 if (imgData) {
-                    const filename = `ai-image-${Date.now()}.${imgData.type}`;
+                    const filename = `${baseFileName}-${internalImgCounter++}-${Date.now()}.${imgData.type}`;
                     const result = await uploadImageToWP(imgData.buffer, filename, `image/${imgData.type}`, altText);
                     if (result) {
                         content = content.replace(fullMatch, `<img src="${result.url}" alt="${altText}" class="aligncenter" />`);

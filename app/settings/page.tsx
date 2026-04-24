@@ -21,6 +21,7 @@ export default function SettingsPage() {
     const [defaultMetaTitlePrompt, setDefaultMetaTitlePrompt] = useState("");
     const [defaultMetaDescPrompt, setDefaultMetaDescPrompt] = useState("");
     const [defaultImagePrompt, setDefaultImagePrompt] = useState("");
+    const [imageSystemPrompt, setImageSystemPrompt] = useState("");
     const [defaultInternalImagePrompt, setDefaultInternalImagePrompt] = useState("");
     const [defaultInfographicPrompt, setDefaultInfographicPrompt] = useState("");
     const [insertContentPrompt, setInsertContentPrompt] = useState("");
@@ -44,6 +45,7 @@ export default function SettingsPage() {
                 setDefaultMetaTitlePrompt(data.settings.defaultMetaTitlePrompt);
                 setDefaultMetaDescPrompt(data.settings.defaultMetaDescPrompt);
                 setDefaultImagePrompt(data.settings.defaultImagePrompt);
+                setImageSystemPrompt(data.settings.imageSystemPrompt || "");
                 setDefaultInternalImagePrompt(data.settings.defaultInternalImagePrompt);
                 setDefaultInfographicPrompt(data.settings.defaultInfographicPrompt);
                 setInsertContentPrompt(data.settings.insertContentPrompt || "");
@@ -81,6 +83,7 @@ export default function SettingsPage() {
                 defaultMetaTitlePrompt,
                 defaultMetaDescPrompt,
                 defaultImagePrompt,
+                imageSystemPrompt,
                 defaultInternalImagePrompt,
                 defaultInfographicPrompt,
                 insertContentPrompt,
@@ -259,6 +262,17 @@ export default function SettingsPage() {
                         rows={3}
                         value={defaultImagePrompt}
                         onChange={e => setDefaultImagePrompt(e.target.value)}
+                        style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid var(--glass-border)', borderRadius: '8px', color: 'var(--text-primary)' }}
+                    />
+                </div>
+
+                <div>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: "bold" }}>Instrucción del Sistema (System Prompt) para Imágenes</label>
+                    <textarea
+                        name="imageSystemPrompt"
+                        rows={4}
+                        value={imageSystemPrompt}
+                        onChange={e => setImageSystemPrompt(e.target.value)}
                         style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid var(--glass-border)', borderRadius: '8px', color: 'var(--text-primary)' }}
                     />
                 </div>

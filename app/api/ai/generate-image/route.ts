@@ -45,7 +45,9 @@ export async function POST(request: Request) {
         }
 
         try {
-            const systemPromptMsg = `You are an expert prompt engineer for AI image generators (DALL-E, Imagen). Your task is to read the user's instructions and the provided article context, and output ONLY the final, highly descriptive image prompt in ENGLISH. Do NOT output translations, explanations, or quotes. The prompt must be in ENGLISH because image models perform drastically better in English. Always respect the user's stylistic choices (e.g., if they say "real photo, natural, not professional", enforce that in your final prompt). STRICTLY stick to the context provided. Do not hallucinate unrelated subjects like forests unless explicitly mentioned.\n\nUser's Image Guidelines:\n${sysPrompt}`;
+            const defaultSystemPrompt = `You are an expert prompt engineer for AI image generators (DALL-E, Imagen). Your task is to read the user's instructions and the provided article context, and output ONLY the final, highly descriptive image prompt in ENGLISH. Do NOT output translations, explanations, or quotes. The prompt must be in ENGLISH because image models perform drastically better in English. Always respect the user's stylistic choices (e.g., if they say "real photo, natural, not professional", enforce that in your final prompt). STRICTLY stick to the context provided. Do not hallucinate unrelated subjects like forests unless explicitly mentioned.`;
+            const baseSystemPrompt = settings?.imageSystemPrompt || defaultSystemPrompt;
+            const systemPromptMsg = `${baseSystemPrompt}\n\nUser's Image Guidelines:\n${sysPrompt}`;
             const userPromptMsg = `Article Title / Main Topic:\n${articleTitle || "Unknown"}\n\nArticle Context Before Cursor:\n${contextBefore}\n\nArticle Context After Cursor:\n${contextAfter}`;
 
             if (textModel.includes("gemini")) {
