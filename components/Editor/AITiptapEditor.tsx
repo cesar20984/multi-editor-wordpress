@@ -738,7 +738,7 @@ export function AITiptapEditor({ project, settings, existingPost }: { project: a
             const res = await fetch("/api/ai/generate-image", {
                 method: "POST",
                 body: JSON.stringify({
-                    contextBefore: `Título del artículo: ${title}\n\nResumen del contenido: ${editor.getText().slice(0, 800)}`,
+                    contextBefore: `Título del artículo: ${title}`,
                     contextAfter: "",
                     wordPressSiteId: siteId,
                     model: settings?.imageModel || "dall-e-3",
